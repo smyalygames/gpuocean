@@ -99,7 +99,7 @@ class HIPArray2D(BaseArray2D):
 
         data = np.zeros(self.shape, dtype=self.dtype)
 
-        # Parameters to copy to GPU memory
+        # Parameters to copy from GPU memory
         src = Device(self.data, self.pitch_d, self.dtype)
         dst = Host(data)
         transfer = Transfer(src, dst, self.width, self.height)
