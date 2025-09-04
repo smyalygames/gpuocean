@@ -6,11 +6,11 @@ channels:
 
 # If you update this list, please also update gpu_ocean/requirements.txt
 dependencies:
-- python=3.7
+- python=3.10
 - conda-build
 - ipykernel
 - numpy
-- matplotlib=3.3.3
+- matplotlib
 - netcdf4
 - pytest
 - xmlrunner
@@ -28,6 +28,10 @@ dependencies:
 - seawater
 - gitpython
 - scikit-image
+- pip:
+    - pycuda
+    - hip-python==6.4.1.552.39
+    - --extra-index-url https://test.pypi.org/simple/
 # Activate environment and install the following packages using pip:
 # $ conda activate gpuocean
 # $ pip3 install --trusted-host files.pythonhosted.org --no-deps -U pycuda
