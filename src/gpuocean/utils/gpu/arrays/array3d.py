@@ -48,6 +48,8 @@ class BaseArray3D(Generic[T]):
         if (self.bytes_per_float != 4 and not double_precision) and (self.bytes_per_float != 8 and double_precision):
             raise ValueError("Wrong size of data type. It should an array of 32 or 64 bit floats.")
 
+        self.holds_data = True
+
         self.mask = None
         if np.ma.is_masked(data):
             self.mask = data.mask
@@ -66,7 +68,7 @@ class BaseArray3D(Generic[T]):
 
     def download(self, gpu_stream) -> data_t:
         """
-        Enables downloading data from CUDA device to Python
+        Enables downloading data from GPU device to Python
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")
 

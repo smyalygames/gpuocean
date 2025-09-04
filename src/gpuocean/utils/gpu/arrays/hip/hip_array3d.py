@@ -33,16 +33,19 @@ class HIPArray3D(BaseArray3D):
         # Pointer for the memory
         self.data = hip.hipPitchedPtr()
         # Allocating memory
-        hip.hipMalloc3D(self.data, self.extent)
+        hip_check(hip.hipMalloc3D(self.data, self.extent))
 
-        src_pos = hip.hipPos(x=0, y=0, z=0)
+        self.__pos = hip.hipPos(x=0, y=0, z=0)
 
-        copy_params = hip.hipMemcpy3DParms(srcArray=self.__host_data, srcPos=src_pos, srcPtr=)
+        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self.__host_data,
+                                           dstPos=self.__pos, dstPtr=self.data,
+                                           kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
 
-        hip_check(hip.hipMemcpy3DAsync(params, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
 
-    def __del__(self, *args):
-        hip_check(hip.hipFree(self.data))
+        # FIXME: This may be dangerous, as the array may be deleted when the memory copy to the GPU occurs.
+        #  This should be tested.
+        self.__host_data = None
 
     def upload(self, gpu_stream: hip.ihipStream_t, data: data_t):
         if not self.holds_data:
@@ -57,12 +60,11 @@ class HIPArray3D(BaseArray3D):
         self.__check(host_data.shape, host_data.itemsize)
 
         # Parameters to copy to GPU memory
-        src = Host(data)
-        dst = Device(self.data, self.pitch_d, self.dtype)
-        transfer = Transfer(src, dst, self.width, self.height)
-        copy = transfer.get_transfer()
+        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=data,
+                                           dstPos=self.__pos, dstPtr=self.data,
+                                           kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
 
     def copy_buffer(self, gpu_stream, buffer: HIPArray3D) -> None:
         if not self.holds_data:
@@ -71,15 +73,14 @@ class HIPArray3D(BaseArray3D):
         if not buffer.holds_data:
             raise RuntimeError('The provided buffer is either not allocated, or has been freed before copying buffer')
 
-        self.__check((buffer.ny_halo, buffer.nx_halo), buffer.bytes_per_float)
+        self.__check(buffer.shape[::-1], buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
-        src = Device(self.data, self.pitch_d, self.dtype)
-        dst = Device(buffer.data, buffer.pitch_d, buffer.dtype)
-        transfer = Transfer(src, dst, self.width, self.height)
-        copy = transfer.get_transfer()
+        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=buffer.data,
+                                           dstPos=self.__pos, dstPtr=self.data,
+                                           kind=hip.hipMemcpyKind.hipMemcpyDeviceToDevice)
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
 
     def download(self, gpu_stream: hip.ihipStream_t) -> np.ndarray:
         """
@@ -87,21 +88,24 @@ class HIPArray3D(BaseArray3D):
         Args:
             gpu_stream: The GPU stream to add the memory copy to.
         Returns:
-            ``data`` with the data from the GPU memory.
+            A numpy array with the data from the GPU memory.
             Note the data in `cpu_data` may be uninitialized if `asynch` was not set to `True`.
         """
 
         if not self.holds_data:
             raise RuntimeError('HIP buffer has been freed')
 
-        data = np.zeros(self.shape, dtype=self.dtype)
+        data_h = np.zeros(self.shape, dtype=self.dtype)
 
-        # Parameters to copy to GPU memory
-        src = Device(self.data, self.pitch_d, self.dtype)
-        dst = Host(data)
-        transfer = Transfer(src, dst, self.width, self.height)
-        copy = transfer.get_transfer()
+        # Parameters to copy from GPU memory
+        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self.data,
+                                           dstPos=self.__pos, dstPtr=data_h,
+                                           kind=hip.hipMemcpyKind.hipMemcpyDeviceToHost)
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
 
-        return data
+        return data_h
+
+    def release(self):
+        hip_check(hip.hipFree(self.data))
+
