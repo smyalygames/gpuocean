@@ -6,7 +6,7 @@ from hip import hip
 
 from ...hip_utils import hip_check
 from ..array3d import BaseArray3D
-from .enums import Host, Device, Transfer
+from ...kernels.hip.hip_stream import HIPStream
 
 if TYPE_CHECKING:
     from ..array3d import data_t
@@ -17,7 +17,7 @@ class HIPArray3D(BaseArray3D):
     Class that holds 2D HIP data
     """
 
-    def __init__(self, gpu_stream: hip.ihipStream_t, nx: int, ny: int, nc: int, data: data_t,
+    def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, nc: int, data: data_t,
                  double_precision=False, integers=False):
         """
         Uploads initial data to the HIP device
@@ -41,13 +41,13 @@ class HIPArray3D(BaseArray3D):
                                            dstPos=self.__pos, dstPtr=self.data,
                                            kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
 
-        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
         # FIXME: This may be dangerous, as the array may be deleted when the memory copy to the GPU occurs.
         #  This should be tested.
         self.__host_data = None
 
-    def upload(self, gpu_stream: hip.ihipStream_t, data: data_t):
+    def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
 
@@ -64,9 +64,9 @@ class HIPArray3D(BaseArray3D):
                                            dstPos=self.__pos, dstPtr=self.data,
                                            kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
 
-        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
-    def copy_buffer(self, gpu_stream, buffer: HIPArray3D) -> None:
+    def copy_buffer(self, gpu_stream: HIPStream, buffer: HIPArray3D) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before copying buffer')
 
@@ -80,9 +80,9 @@ class HIPArray3D(BaseArray3D):
                                            dstPos=self.__pos, dstPtr=self.data,
                                            kind=hip.hipMemcpyKind.hipMemcpyDeviceToDevice)
 
-        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
-    def download(self, gpu_stream: hip.ihipStream_t) -> np.ndarray:
+    def download(self, gpu_stream: HIPStream) -> np.ndarray:
         """
         Enables downloading data from GPU to Python
         Args:
@@ -102,7 +102,7 @@ class HIPArray3D(BaseArray3D):
                                            dstPos=self.__pos, dstPtr=data_h,
                                            kind=hip.hipMemcpyKind.hipMemcpyDeviceToHost)
 
-        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream))
+        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
         return data_h
 

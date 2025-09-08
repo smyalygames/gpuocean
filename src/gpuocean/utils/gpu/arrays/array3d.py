@@ -3,10 +3,11 @@ from typing import TypeVar, Generic, Union, TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
+from .. import GPUStream
 from ...utils import convert_to_float32
 
 if TYPE_CHECKING:
-    from .. import Array3D, stream_t
+    from .. import Array3D
 
 T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]
@@ -17,7 +18,7 @@ class BaseArray3D(Generic[T]):
     A base class that holds 3D data. To be used depending on the GPGPU language.
     """
 
-    def __init__(self, gpu_stream: stream_t, nx: int, ny: int, nc: int, data: data_t,
+    def __init__(self, gpu_stream: GPUStream, nx: int, ny: int, nc: int, data: data_t,
                  double_precision=False, integers=False):
         """
         Uploads initial data to the CL device
@@ -54,19 +55,19 @@ class BaseArray3D(Generic[T]):
         if np.ma.is_masked(data):
             self.mask = data.mask
 
-    def upload(self, gpu_stream, data: data_t) -> None:
+    def upload(self, gpu_stream: GPUStream, data: data_t) -> None:
         """
         Filling the allocated buffer with new data.
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")
 
-    def copy_buffer(self, gpu_stream, buffer: Array3D) -> None:
+    def copy_buffer(self, gpu_stream: GPUStream, buffer: Array3D) -> None:
         """
         Copying the given device buffer into the already allocated memory
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")
 
-    def download(self, gpu_stream) -> data_t:
+    def download(self, gpu_stream: GPUStream) -> data_t:
         """
         Enables downloading data from GPU device to Python
         """

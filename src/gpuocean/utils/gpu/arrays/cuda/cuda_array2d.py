@@ -6,6 +6,7 @@ import pycuda.gpuarray
 import pycuda.driver as cuda
 
 from ..array2d import BaseArray2D
+from ...kernels.cuda.cuda_stream import CudaStream
 
 if TYPE_CHECKING:
     from ..array2d import data_t
@@ -16,7 +17,7 @@ class CudaArray2D(BaseArray2D):
     Class that holds 2D CUDA data
     """
 
-    def __init__(self, gpu_stream: cuda.Stream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
+    def __init__(self, gpu_stream: CudaStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
                  asym_halo: list[int] = None, double_precision=False):
         """
         Uploads initial data to the CUDA device
@@ -24,7 +25,7 @@ class CudaArray2D(BaseArray2D):
 
         super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision)
 
-        self.data = pycuda.gpuarray.to_gpu_async(self.__host_data, stream=gpu_stream)
+        self.data = pycuda.gpuarray.to_gpu_async(self.__host_data, stream=gpu_stream.pointer)
         self.pitch = np.int32(self.nx_halo * self.bytes_per_float)
         self.__host_data = None
 
@@ -33,7 +34,7 @@ class CudaArray2D(BaseArray2D):
         self.data.gpudata.free()
         self.data = None
 
-    def upload(self, gpu_stream: cuda.Stream, data: data_t) -> None:
+    def upload(self, gpu_stream: CudaStream, data: data_t) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
 
@@ -46,9 +47,9 @@ class CudaArray2D(BaseArray2D):
         self.__check(host_data.shape, host_data.itemsize)
 
         # Okay, everything is fine, now upload:
-        self.data.set_async(host_data, stream=gpu_stream)
+        self.data.set_async(host_data, stream=gpu_stream.pointer)
 
-    def copy_buffer(self, gpu_stream: cuda.Stream, buffer: CudaArray2D) -> None:
+    def copy_buffer(self, gpu_stream: CudaStream, buffer: CudaArray2D) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before copying buffer')
 
@@ -59,14 +60,14 @@ class CudaArray2D(BaseArray2D):
 
         # Okay, everything is fine - issue device-to-device-copy:
         total_num_bytes = self.bytes_per_float * self.nx_halo * self.ny_halo
-        cuda.memcpy_dtod_async(self.data.ptr, buffer.data.ptr, total_num_bytes, stream=gpu_stream)
+        cuda.memcpy_dtod_async(self.data.ptr, buffer.data.ptr, total_num_bytes, stream=gpu_stream.pointer)
 
-    def download(self, gpu_stream: cuda.Stream) -> data_t:
+    def download(self, gpu_stream: CudaStream) -> data_t:
         if not self.holds_data:
             raise RuntimeError('CUDA buffer has been freed')
 
         # Copy data from device to host
-        host_data = self.data.get(stream=gpu_stream)
+        host_data = self.data.get(stream=gpu_stream.pointer)
 
         if self.mask is not None:
             host_data = np.ma.array(host_data, mask=self.mask)

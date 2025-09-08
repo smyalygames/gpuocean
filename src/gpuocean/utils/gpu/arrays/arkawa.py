@@ -22,15 +22,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from typing import TypeVar, Union, TYPE_CHECKING
+from typing import TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
 
-from .. import Array2D
-
-if TYPE_CHECKING:
-    from .. import stream_t
+from .. import Array2D, GPUStream
 
 T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]
@@ -41,7 +38,7 @@ class SWEDataArakawaA:
     A class representing an Arakawa A type (unstaggered, logically Cartesian) grid
     """
 
-    def __init__(self, gpu_stream: stream_t, nx: int, ny: int, halo_x: int, halo_y: int, h0: data_t, hu0: data_t,
+    def __init__(self, gpu_stream: GPUStream, nx: int, ny: int, halo_x: int, halo_y: int, h0: data_t, hu0: data_t,
                  hv0: data_t):
         """
         Uploads initial data to the GPU device
@@ -62,7 +59,7 @@ class SWEDataArakawaA:
         self.hu1, self.hu0 = self.hu0, self.hu1
         self.hv1, self.hv0 = self.hv0, self.hv1
 
-    def download(self, gpu_stream):
+    def download(self, gpu_stream: GPUStream):
         """
         Enables downloading data from CUDA device to Python
         """
@@ -90,7 +87,7 @@ class SWEDataArakawaC:
     We use h as cell centers
     """
 
-    def __init__(self, gpu_stream: stream_t, nx: int, ny: int, halo_x: int, halo_y: int, h0: data_t, hu0: data_t,
+    def __init__(self, gpu_stream: GPUStream, nx: int, ny: int, halo_x: int, halo_y: int, h0: data_t, hu0: data_t,
                  hv0: data_t, fbl=False):
         """
         Uploads initial data to the GPU device
@@ -125,7 +122,7 @@ class SWEDataArakawaC:
         self.hu1, self.hu0 = self.hu0, self.hu1
         self.hv1, self.hv0 = self.hv0, self.hv1
 
-    def download(self, gpu_stream: stream_t, interior_domain_only=False):
+    def download(self, gpu_stream: GPUStream, interior_domain_only=False):
         """
         Enables downloading data from GPU device to Python (CPU)
         """
@@ -139,7 +136,7 @@ class SWEDataArakawaC:
 
         return h_cpu, hu_cpu, hv_cpu
 
-    def download_prev_timestep(self, gpu_stream: stream_t):
+    def download_prev_timestep(self, gpu_stream: GPUStream):
         """
         Enables downloading data from the additional buffer of the GPU device to Python (CPU)
         """

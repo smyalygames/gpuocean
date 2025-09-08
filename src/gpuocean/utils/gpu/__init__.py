@@ -9,6 +9,7 @@ if __env_name in environ and environ.get(__env_name).lower() == "cuda":
     from .kernels.cuda.cuda_context import CudaContext as KernelContext
     from .kernels.cuda.cuda_handler import CudaHandler as GPUHandler
     from .kernels.cuda.cuda_event import CudaEvent as Event
+    from .kernels.cuda.cuda_stream import CudaStream as GPUStream
 
     if TYPE_CHECKING:
         from pycuda import driver
@@ -16,10 +17,11 @@ if __env_name in environ and environ.get(__env_name).lower() == "cuda":
         module_t = driver.Module
 else:
     from .arrays.hip.hip_array2d import HIPArray2D as Array2D
-    # from .arrays.hip.hip_array3d import HIPArray3D as Array3D
+    from .arrays.hip.hip_array3d import HIPArray3D as Array3D
     from .kernels.hip.hip_context import HIPContext as KernelContext
     from .kernels.hip.hip_handler import HIPHandler as GPUHandler
     from .kernels.hip.hip_event import HIPEvent as Event
+    from .kernels.hip.hip_stream import HIPStream as GPUStream
 
     if TYPE_CHECKING:
         from hip import hip

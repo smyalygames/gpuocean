@@ -8,6 +8,7 @@ from hip._util.types import Pointer
 from ...hip_utils import hip_check
 from ..array2d import BaseArray2D
 from .enums import Host, Device, Transfer
+from ...kernels.hip.hip_stream import HIPStream
 
 if TYPE_CHECKING:
     from ..array2d import data_t
@@ -18,7 +19,7 @@ class HIPArray2D(BaseArray2D):
     Class that holds 2D HIP data
     """
 
-    def __init__(self, gpu_stream: hip.ihipStream_t, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
+    def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
                  asym_halo: list[int] = None, double_precision=False):
         """
         Uploads initial data to the HIP device
@@ -39,7 +40,7 @@ class HIPArray2D(BaseArray2D):
         hip_check(hip.hipMemcpy2DAsync(self.data, self.pitch_d,
                                        self.__host_data, data.strides[0],
                                        self.width, self.height,
-                                       hip.hipMemcpyKind.hipMemcpyHostToDevice, gpu_stream))
+                                       hip.hipMemcpyKind.hipMemcpyHostToDevice, gpu_stream.pointer))
 
         # FIXME: This could be potentially dangerous as it could be deleting the entire array before the copy has been completed.
         self.__host_data = None
@@ -47,7 +48,7 @@ class HIPArray2D(BaseArray2D):
     def __del__(self, *args):
         hip_check(hip.hipFree(self.data))
 
-    def upload(self, gpu_stream: hip.ihipStream_t, data: data_t):
+    def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
 
@@ -65,9 +66,9 @@ class HIPArray2D(BaseArray2D):
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
 
-    def copy_buffer(self, gpu_stream, buffer: HIPArray2D) -> None:
+    def copy_buffer(self, gpu_stream: HIPStream, buffer: HIPArray2D) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before copying buffer')
 
@@ -82,9 +83,9 @@ class HIPArray2D(BaseArray2D):
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
 
-    def download(self, gpu_stream: hip.ihipStream_t) -> np.ndarray:
+    def download(self, gpu_stream: HIPStream) -> np.ndarray:
         """
         Enables downloading data from GPU to Python
         Args:
@@ -105,6 +106,6 @@ class HIPArray2D(BaseArray2D):
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
-        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream))
+        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
 
         return data

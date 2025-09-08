@@ -3,7 +3,7 @@ import pycuda.driver as cuda
 from ..stream import Stream
 
 
-class HIPStream(Stream):
+class CudaStream(Stream):
     """
     An object to handle CUDA Streams
     """
