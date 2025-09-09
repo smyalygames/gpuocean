@@ -105,8 +105,7 @@ class CudaContext(Context):
     def __str__(self):
         return "CudaContext id " + str(self.cuda_context.handle)
 
-    def get_module(self, kernel_filename: str,
-                   function: str,
+    def get_kernel(self, kernel_filename: str,
                    include_dirs: dict = None,
                    defines: dict[str, dict] = None,
                    compile_args: dict = None,

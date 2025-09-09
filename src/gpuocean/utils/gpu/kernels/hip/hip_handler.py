@@ -1,33 +1,23 @@
+from typing import TYPE_CHECKING
 import ctypes
 
 import numpy as np
-from hip import hip, hipblas
+from hip import hip
 
 from ...hip_utils import hip_check
 from ..handler import BaseGPUHandler
-from gpuocean.utils.gpu import KernelContext
+
+if TYPE_CHECKING:
+    from ... import GPUStream
 
 
 class HIPHandler(BaseGPUHandler):
-    def __init__(self, context: KernelContext, module, function, arguments,
-                 grid_size):
-        super().__init__(context, module, function, arguments, grid_size)
+    def __init__(self, module, function, arguments):
+        super().__init__(module, function, arguments)
 
         self.kernel = hip_check(hip.hipModuleGetFunction(module, bytes(function, "utf-8")))
-        self.context = context
 
-        self.dtype = np.float32
-        self.cfl_data_h = np.empty(grid_size, dtype=self.dtype)
-
-        self.num_bytes = self.cfl_data_h.size * self.cfl_data_h.itemsize
-        self.cfl_data = hip_check(hip.hipMalloc(self.num_bytes)).configure(
-            typestr=self.cfl_data_h.dtype.str, shape=grid_size
-        )
-
-    def __del__(self):
-        hip_check(hip.hipFree(self.cfl_data))
-
-    def prepared_call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: hip.ihipStream_t,
+    def call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: GPUStream,
                       args: list):
         grid = hip.dim3(*grid_size)
         block = hip.dim3(*block_size)
@@ -52,24 +42,3 @@ class HIPHandler(BaseGPUHandler):
             kernelParams=None,
             extra=args
         ))
-
-    def array_fill(self, data: float, stream: hip.ihipStream_t):
-        self.cfl_data_h.fill(data)
-
-        hip_check(
-            hip.hipMemcpyAsync(self.cfl_data, self.cfl_data_h, self.num_bytes, hip.hipMemcpyKind.hipMemcpyHostToDevice,
-                               stream))
-
-    def array_min(self, stream: hip.ihipStream_t) -> float:
-        handle = hip_check(hipblas.hipblasCreate())
-
-        value_h = np.empty(1, self.dtype)
-        value_d = hip_check(hip.hipMalloc(value_h.itemsize))
-
-        hip_check(hipblas.hipblasIsamin(handle, self.cfl_data.size, self.cfl_data, 1, value_d))
-        hip_check(hipblas.hipblasDestroy(handle))
-
-        hip_check(
-            hip.hipMemcpy(value_h, self.cfl_data, self.cfl_data_h.itemsize, hip.hipMemcpyKind.hipMemcpyDeviceToHost))
-
-        return value_h[0]

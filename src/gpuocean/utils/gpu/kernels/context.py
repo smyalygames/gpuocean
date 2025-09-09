@@ -110,8 +110,7 @@ class Context(object):
 
         return kernel_hasher.hexdigest()
 
-    def get_module(self, kernel_filename: str,
-                   function: str,
+    def get_kernel(self, kernel_filename: str,
                    include_dirs: dict = None,
                    defines: dict[str, dict] = None,
                    compile_args: dict = None,

@@ -26,7 +26,6 @@ class HIPContext(Context):
             use_cache: Uses previously compiled kernel cache.
         """
         super().__init__(Context.Architecture.HIP, device, context_flags, use_cache)
-        self.prog: dict[str, hiprtc.hiprtcProgram] = {}
 
         # Log information about HIP version
         self.logger.info(f"HIP Python version {hip_main.HIP_VERSION_NAME}")
@@ -52,9 +51,6 @@ class HIPContext(Context):
         for module in self.modules.values():
             hip_check(hip.hipModuleUnload(module))
 
-        for prog in self.prog.values():
-            hip_check(hiprtc.hiprtcDestroyProgram(prog.createRef()))
-
     def __str__(self):
         return f"HIPContext id {self.get_device_id()}"
 
@@ -62,8 +58,7 @@ class HIPContext(Context):
     def get_device_id() -> int:
         return hip_check(hip.hipGetDevice())
 
-    def get_module(self, kernel_filename: str,
-                   function: str,
+    def get_kernel(self, kernel_filename: str,
                    include_dirs: list[str] = None,
                    defines: dict[str, int] = None,
                    compile_args: dict[str, list] = None,
@@ -73,7 +68,6 @@ class HIPContext(Context):
 
         Args:
             kernel_filename: The file to use for the kernel.
-            function: The main function of the kernel.
             include_dirs: List of directories for the ``#include``s referenced.
             defines: Adds ``#define`` tags to the kernel, such as: ``#define key value``.
             compile_args: Adds other compiler options (parameters) for ``pycuda.compiler.compile()``.
@@ -146,7 +140,7 @@ class HIPContext(Context):
 
             with Timer("compiler") as timer:
                 prog: hiprtc.hiprtcProgram = hip_check(
-                    hiprtc.hiprtcCreateProgram(bytes(kernel_string, "utf-8"), bytes(function, "utf-8"),
+                    hiprtc.hiprtcCreateProgram(bytes(kernel_string, "utf-8"), bytes(kernel_filename, "utf-8"),
                                                0, [], []))
 
                 err, = hiprtc.hiprtcCompileProgram(prog, len(compile_args), compile_args)
@@ -159,6 +153,9 @@ class HIPContext(Context):
                 code_size = hip_check(hiprtc.hiprtcGetCodeSize(prog))
                 code = bytearray(code_size)
                 hip_check(hiprtc.hiprtcGetCode(prog, code))
+
+                hip_check(hiprtc.hiprtcDestroyProgram(prog))
+
                 module: hip.ihipModule_t = hip_check(hip.hipModuleLoadData(code))
 
                 if self.use_cache:
@@ -166,7 +163,6 @@ class HIPContext(Context):
                         file.write(code)
 
             self.modules[kernel_hash] = module
-            self.prog[kernel_hash] = prog
             return module
 
     def synchronize(self) -> None:
