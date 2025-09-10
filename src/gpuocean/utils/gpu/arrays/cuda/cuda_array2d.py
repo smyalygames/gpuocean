@@ -18,12 +18,12 @@ class CudaArray2D(BaseArray2D):
     """
 
     def __init__(self, gpu_stream: CudaStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False):
         """
         Uploads initial data to the CUDA device
         """
 
-        super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision)
+        super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision, integers)
 
         self.data = pycuda.gpuarray.to_gpu_async(self.__host_data, stream=gpu_stream.pointer)
         self.pitch = np.int32(self.nx_halo * self.bytes_per_float)

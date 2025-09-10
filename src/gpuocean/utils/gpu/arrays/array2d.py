@@ -19,12 +19,13 @@ class BaseArray2D(Generic[T]):
     """
 
     def __init__(self, gpu_stream: GPUStream, nx: int, ny: int, halo_x: int, halo_y: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False):
         """
         Uploads initial data to the CUDA device
         """
 
         self.double_precision = double_precision
+        self.integers = integers
         self.__host_data = self.__convert_to_precision(data)
         self.dtype = self.__host_data.dtype
 

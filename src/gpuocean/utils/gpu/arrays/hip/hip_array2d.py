@@ -20,12 +20,12 @@ class HIPArray2D(BaseArray2D):
     """
 
     def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False):
         """
         Uploads initial data to the HIP device
         """
 
-        super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision)
+        super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision, integers)
         shape_x = self.shape[0]
         shape_y = self.shape[1]
 
