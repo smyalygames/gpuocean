@@ -19,14 +19,25 @@ class BaseGPUHandler(object):
             arguments: A string of the argument types to parse to the kernel.
         """
 
-    def call(self, grid_size, block_size: tuple[int, int, int], stream: GPUStream, args: list):
+    def async_call(self, grid_size, block_size: tuple[int, int, int], stream: GPUStream, args: list):
+        """
+        Makes an asynchronous call to the kernel on the GPU with the function that was used to initialize this object.
+
+        Args:
+            grid_size: The size of the grid to do the computation of.
+            block_size: The block size, as a tuple.
+            stream: The GPU data stream.
+            args: Parameters to be passed into the GPU kernel.
+        """
+        raise NotImplementedError("This function needs to be implemented in a subclass.")
+
+    def call(self, grid_size, block_size: tuple[int, int, int], args: list):
         """
         Makes a call to the kernel on the GPU with the function that was used to initialize this object.
 
         Args:
             grid_size: The size of the grid to do the computation of.
             block_size: The block size, as a tuple.
-            stream: The GPU data stream.
             args: Parameters to be passed into the GPU kernel.
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")

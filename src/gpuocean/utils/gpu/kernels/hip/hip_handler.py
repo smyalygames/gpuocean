@@ -17,8 +17,8 @@ class HIPHandler(BaseGPUHandler):
 
         self.kernel = hip_check(hip.hipModuleGetFunction(module, bytes(function, "utf-8")))
 
-    def call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: GPUStream,
-                      args: list):
+    def async_call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: GPUStream | None,
+                   args: list):
         grid = hip.dim3(*grid_size)
         block = hip.dim3(*block_size)
 
@@ -33,6 +33,11 @@ class HIPHandler(BaseGPUHandler):
 
         args = tuple(args)
 
+        if isinstance(stream, GPUStream):
+            hip_stream = stream.pointer
+        else:
+            hip_stream = None
+
         hip_check(hip.hipModuleLaunchKernel(
             self.kernel,
             *grid,
@@ -42,3 +47,6 @@ class HIPHandler(BaseGPUHandler):
             kernelParams=None,
             extra=args
         ))
+
+    def call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], args: list):
+        self.async_call(grid_size, block_size, None, args)
