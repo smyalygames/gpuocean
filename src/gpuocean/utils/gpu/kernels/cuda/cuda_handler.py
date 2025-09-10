@@ -6,12 +6,12 @@ from pycuda import gpuarray
 from ..handler import BaseGPUHandler
 
 if TYPE_CHECKING:
-    from pycuda import driver
+    import pycuda.driver as cuda
     from ... import KernelContext
 
 
 class CudaHandler(BaseGPUHandler):
-    def __init__(self, module, function, arguments):
+    def __init__(self, module: cuda.Module, function: str, arguments: str):
         super().__init__(module, function, arguments)
 
         self.arguments = arguments

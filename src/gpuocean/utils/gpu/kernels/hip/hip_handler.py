@@ -8,11 +8,11 @@ from ...hip_utils import hip_check
 from ..handler import BaseGPUHandler
 
 if TYPE_CHECKING:
-    from ... import GPUStream
+    from ... import KernelContext, GPUStream
 
 
 class HIPHandler(BaseGPUHandler):
-    def __init__(self, module, function, arguments):
+    def __init__(self, module: hip.ihipModule_t, function: str, arguments: str):
         super().__init__(module, function, arguments)
 
         self.kernel = hip_check(hip.hipModuleGetFunction(module, bytes(function, "utf-8")))
