@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -7,7 +8,6 @@ from ..handler import BaseGPUHandler
 
 if TYPE_CHECKING:
     import pycuda.driver as cuda
-    from ... import KernelContext
 
 
 class CudaHandler(BaseGPUHandler):

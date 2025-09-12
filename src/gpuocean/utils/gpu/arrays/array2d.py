@@ -1,13 +1,13 @@
+from __future__ import annotations
 from typing import TypeVar, Generic, Union, TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
-from .. import GPUStream
 from ...utils import convert_to_float32
 
 if TYPE_CHECKING:
-    from .. import Array2D
+    from .. import GPUStream, Array2D
 
 T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]

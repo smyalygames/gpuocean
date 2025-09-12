@@ -1,14 +1,13 @@
 import hashlib
 import io
 import os.path
-from typing import TYPE_CHECKING
 
 import hip as hip_main
 from hip import hip, hiprtc
 
 from ..context import Context
 from ...hip_utils import hip_check
-from gpuocean.utils.Common import Timer
+from gpuocean.utils.timer import Timer
 
 
 class HIPContext(Context):

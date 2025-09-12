@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 import ctypes
 
@@ -8,7 +9,7 @@ from ...hip_utils import hip_check
 from ..handler import BaseGPUHandler
 
 if TYPE_CHECKING:
-    from ... import KernelContext, GPUStream
+    from ... import GPUStream
 
 
 class HIPHandler(BaseGPUHandler):

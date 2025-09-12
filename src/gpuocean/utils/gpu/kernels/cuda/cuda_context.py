@@ -28,7 +28,7 @@ import pycuda.compiler as cuda_compiler
 import pycuda.gpuarray
 import pycuda.driver as cuda
 
-from gpuocean.utils.Common import Timer
+from gpuocean.utils.timer import Timer
 from ..context import Context
 
 

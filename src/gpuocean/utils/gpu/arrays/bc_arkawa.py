@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 import logging
 
@@ -204,7 +205,7 @@ class BoundaryConditionsArakawaA:
         self.__periodic_boundary(self.periodicBoundary_EW, gpu_stream, h, u, v)
 
     def __periodic_boundary(self, funct: GPUHandler, gpu_stream: GPUStream, h, u, v):
-        funct.call(
+        funct.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.nx, self.ny,
             self.halo_x, self.halo_y,
@@ -213,7 +214,7 @@ class BoundaryConditionsArakawaA:
             v.data.gpudata, v.pitch])
 
     def linear_interpolation_NS(self, gpu_stream, h, u, v):
-        self.linearInterpolation_NS.call(
+        self.linearInterpolation_NS.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.boundary_conditions.north, self.boundary_conditions.south,
             self.nx, self.ny,
@@ -225,7 +226,7 @@ class BoundaryConditionsArakawaA:
             v.data.gpudata, v.pitch])
 
     def linear_interpolation_EW(self, gpu_stream, h, u, v):
-        self.linearInterpolation_EW.call(
+        self.linearInterpolation_EW.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.boundary_conditions.east, self.boundary_conditions.west,
             self.nx, self.ny,
@@ -237,7 +238,7 @@ class BoundaryConditionsArakawaA:
             v.data.gpudata, v.pitch])
 
     def flow_relaxation_NS(self, gpu_stream, h, u, v):
-        self.flowRelaxationScheme_NS.call(
+        self.flowRelaxationScheme_NS.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.boundary_conditions.north, self.boundary_conditions.south,
             self.nx, self.ny,
@@ -252,7 +253,7 @@ class BoundaryConditionsArakawaA:
             self.bc_t])
 
     def flow_relaxation_EW(self, gpu_stream, h, u, v):
-        self.flowRelaxationScheme_EW.call(
+        self.flowRelaxationScheme_EW.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.boundary_conditions.east, self.boundary_conditions.west,
             self.nx, self.ny,
