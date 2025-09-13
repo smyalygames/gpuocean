@@ -47,6 +47,10 @@ class HIPArray3D(BaseArray3D):
         #  This should be tested.
         self.__host_data = None
 
+    @property
+    def pointer(self) -> hip.hipPitchedPtr:
+        return self.data
+
     def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
@@ -107,5 +111,7 @@ class HIPArray3D(BaseArray3D):
         return data_h
 
     def release(self):
-        hip_check(hip.hipFree(self.data))
+        if self.holds_data:
+            hip_check(hip.hipFree(self.data))
+            self.holds_data = False
 

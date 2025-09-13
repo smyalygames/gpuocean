@@ -39,7 +39,7 @@ class BoundaryConditionsArakawaA:
         # print("numerical sponge cells (n,e,s,w): ", self.boundary_conditions.spongeCells)
 
         # Load CUDA module for periodic boundary
-        self.boundaryKernels = gpu_ctx.get_kernel("boundary_kernels.cu",
+        self.boundaryKernels = gpu_ctx.get_kernel("boundary_kernels",
                                                   defines={'block_width': block_width, 'block_height': block_height,
                                                            'BC_NS_NX': int(self.bc_data.north.h[0].shape[0]),
                                                            'BC_NS_NY': int(2),
@@ -209,9 +209,9 @@ class BoundaryConditionsArakawaA:
             self.global_size, self.local_size, gpu_stream,
             [self.nx, self.ny,
             self.halo_x, self.halo_y,
-            h.data.gpudata, h.pitch,
-            u.data.gpudata, u.pitch,
-            v.data.gpudata, v.pitch])
+            h.pointer, h.pitch,
+            u.pointer, u.pitch,
+            v.pointer, v.pitch])
 
     def linear_interpolation_NS(self, gpu_stream, h, u, v):
         self.linearInterpolation_NS.async_call(
@@ -221,9 +221,9 @@ class BoundaryConditionsArakawaA:
             self.halo_x, self.halo_y,
             self.boundary_conditions.spongeCells['north'],
             self.boundary_conditions.spongeCells['south'],
-            h.data.gpudata, h.pitch,
-            u.data.gpudata, u.pitch,
-            v.data.gpudata, v.pitch])
+            h.pointer, h.pitch,
+            u.pointer, u.pitch,
+            v.pointer, v.pitch])
 
     def linear_interpolation_EW(self, gpu_stream, h, u, v):
         self.linearInterpolation_EW.async_call(
@@ -233,9 +233,9 @@ class BoundaryConditionsArakawaA:
             self.halo_x, self.halo_y,
             self.boundary_conditions.spongeCells['east'],
             self.boundary_conditions.spongeCells['west'],
-            h.data.gpudata, h.pitch,
-            u.data.gpudata, u.pitch,
-            v.data.gpudata, v.pitch])
+            h.pointer, h.pitch,
+            u.pointer, u.pitch,
+            v.pointer, v.pitch])
 
     def flow_relaxation_NS(self, gpu_stream, h, u, v):
         self.flowRelaxationScheme_NS.async_call(
@@ -245,11 +245,11 @@ class BoundaryConditionsArakawaA:
             self.halo_x, self.halo_y,
             self.boundary_conditions.spongeCells['north'],
             self.boundary_conditions.spongeCells['south'],
-            h.data.gpudata, h.pitch,
-            u.data.gpudata, u.pitch,
-            v.data.gpudata, v.pitch,
-            self.bc_NS_current_arr.data.gpudata,
-            self.bc_NS_next_arr.data.gpudata,
+            h.pointer, h.pitch,
+            u.pointer, u.pitch,
+            v.pointer, v.pitch,
+            self.bc_NS_current_arr.pointer,
+            self.bc_NS_next_arr.pointer,
             self.bc_t])
 
     def flow_relaxation_EW(self, gpu_stream, h, u, v):
@@ -260,9 +260,9 @@ class BoundaryConditionsArakawaA:
             self.halo_x, self.halo_y,
             self.boundary_conditions.spongeCells['east'],
             self.boundary_conditions.spongeCells['west'],
-            h.data.gpudata, h.pitch,
-            u.data.gpudata, u.pitch,
-            v.data.gpudata, v.pitch,
-            self.bc_EW_current_arr.data.gpudata,
-            self.bc_EW_next_arr.data.gpudata,
+            h.pointer, h.pitch,
+            u.pointer, u.pitch,
+            v.pointer, v.pitch,
+            self.bc_EW_current_arr.pointer,
+            self.bc_EW_next_arr.pointer,
             self.bc_t])

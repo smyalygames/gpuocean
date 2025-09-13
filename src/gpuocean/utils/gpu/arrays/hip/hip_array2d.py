@@ -44,6 +44,10 @@ class HIPArray2D(BaseArray2D):
         # FIXME: This could be potentially dangerous as it could be deleting the entire array before the copy has been completed.
         self._host_data = None
 
+    @property
+    def pointer(self) -> Pointer:
+        return self.data
+
     def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')

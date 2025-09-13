@@ -93,9 +93,9 @@ class Bathymetry:
         # Call kernel
         self.initBm.async_call(self.global_size, self.local_size, self.gpu_stream,
                                [self.halo_nx, self.halo_ny,
-                                self.Bi.data.gpudata, self.Bi.pitch,
+                                self.Bi.pointer, self.Bi.pitch,
                                 self.mask_value,
-                                self.Bm.data.gpudata, self.Bm.pitch])
+                                self.Bm.pointer, self.Bm.pitch])
 
     def download(self, gpu_stream: GPUStream) -> (tuple[npt.NDArray, npt.NDArray] |
                                                   tuple[np.ma.MaskedArray, np.ma.MaskedArray]):
@@ -125,8 +125,8 @@ class Bathymetry:
         # Call kernel
         self.waterElevationToDepth.async_call(self.global_size, self.local_size, self.gpu_stream,
                                               [self.halo_nx, self.halo_ny,
-                                               h.data.gpudata, h.pitch,
-                                               self.Bm.data.gpudata, self.Bm.pitch])
+                                               h.pointer, h.pitch,
+                                               self.Bm.pointer, self.Bm.pitch])
 
     # Transforming water depth into water elevation
     def waterDepthToElevation(self, w: Array2D, h: Array2D) -> None:
@@ -138,14 +138,14 @@ class Bathymetry:
         # Call kernel
         self.waterDepthToElevation.async_call(self.global_size, self.local_size, self.gpu_stream,
                                               [self.halo_nx, self.halo_ny,
-                                               w.data.gpudata, w.pitch,
-                                               h.data.gpudata, h.pitch,
-                                               self.Bm.data.gpudata, self.Bm.pitch])
+                                               w.pointer, w.pitch,
+                                               h.pointer, h.pitch,
+                                               self.Bm.pointer, self.Bm.pitch])
 
     def _boundaryConditions(self) -> None:
         args = (self.global_size, self.local_size, self.gpu_stream,
                 [self.nx, self.ny, self.halo_x, self.halo_y,
-                 self.Bi.data.gpudata, self.Bi.pitch])
+                 self.Bi.pointer, self.Bi.pitch])
 
         # North-south:
         if (self.boundary_conditions.north == 2) and (self.boundary_conditions.south == 2):

@@ -30,10 +30,9 @@ class CudaArray3D(BaseArray3D):
         self.holds_data = True
         self.__host_data = None
 
-    def __del__(self, *args):
-        # self.logger.debug("Buffer <%s> [%dx%d]: Releasing ", int(self.data.gpudata), self.nx, self.ny)
-        self.data.gpudata.free()
-        self.data = None
+    @property
+    def pointer(self) -> cuda.DeviceAllocation:
+        return self.data.gpudata
 
     def upload(self, gpu_stream: CudaStream, data: data_t) -> None:
         if not self.holds_data:

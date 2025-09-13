@@ -60,6 +60,15 @@ class BaseArray2D(Generic[T]):
         if np.ma.is_masked(data):
             self.mask = data.mask
 
+    @property
+    def pointer(self):
+        """
+        Gets the pointer for the array on the GPU, that is being managed by this object.
+        Returns:
+            A pointer for the array on the GPU
+        """
+        raise NotImplementedError("This function needs to be implemented in a subclass.")
+
     def upload(self, gpu_stream: GPUStream, data: data_t) -> None:
         """
         Filling the allocated buffer with new data.
