@@ -9,13 +9,13 @@ class CudaStream(Stream):
     """
 
     def __init__(self):
-        self.__stream= cuda.Stream()
+        self._stream = cuda.Stream()
 
     def synchronize(self):
         """
         Synchronize the CUDA Stream
         """
-        self.__stream.synchronize()
+        self._stream.synchronize()
 
     def destroy(self):
         """

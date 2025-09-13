@@ -10,16 +10,16 @@ class HIPStream(Stream):
     """
 
     def __init__(self):
-        self.__stream: hip.ihipStream_t = hip_check(hip.hipStreamCreate())
+        self._stream: hip.ihipStream_t = hip_check(hip.hipStreamCreate())
 
     def synchronize(self):
         """
         Synchronize the HIP Stream
         """
-        hip_check(hip.hipStreamSynchronize(self.__stream))
+        hip_check(hip.hipStreamSynchronize(self._stream))
 
     def destroy(self):
         """
         Destroy the HIP Stream.
         """
-        hip_check(hip.hipStreamDestroy(self.__stream))
+        hip_check(hip.hipStreamDestroy(self._stream))

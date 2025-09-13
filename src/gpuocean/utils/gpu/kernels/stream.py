@@ -9,7 +9,6 @@ class Stream:
     """
     A base class to handle streams for each GPU platform.
     """
-    __stream: stream_t
 
     def __del__(self):
         self.destroy()
@@ -21,7 +20,7 @@ class Stream:
         Returns:
             HIP stream pointer or pycuda Stream.
         """
-        return self.__stream
+        return self._stream
 
     def synchronize(self):
         """
