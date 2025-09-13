@@ -7,9 +7,7 @@ from hip import hip
 
 from ...hip_utils import hip_check
 from ..handler import BaseGPUHandler
-
-if TYPE_CHECKING:
-    from ... import GPUStream
+from .hip_stream import HIPStream
 
 
 class HIPHandler(BaseGPUHandler):
@@ -18,7 +16,7 @@ class HIPHandler(BaseGPUHandler):
 
         self.kernel = hip_check(hip.hipModuleGetFunction(module, bytes(function, "utf-8")))
 
-    def async_call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: GPUStream | None,
+    def async_call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: HIPStream | None,
                    args: list):
         grid = hip.dim3(*grid_size)
         block = hip.dim3(*block_size)
@@ -34,7 +32,7 @@ class HIPHandler(BaseGPUHandler):
 
         args = tuple(args)
 
-        if isinstance(stream, GPUStream):
+        if isinstance(stream, HIPStream):
             hip_stream = stream.pointer
         else:
             hip_stream = None
@@ -44,7 +42,7 @@ class HIPHandler(BaseGPUHandler):
             *grid,
             *block,
             sharedMemBytes=0,
-            stream=stream,
+            stream=hip_stream,
             kernelParams=None,
             extra=args
         ))
