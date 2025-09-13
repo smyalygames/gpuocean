@@ -8,8 +8,36 @@ from hip._util.types import Pointer
 
 
 class __Location:
-    memory_type: hip.hipMemoryType
-    location_options = ('str', 'dst')
+    location_options = {'src', 'dst'}
+
+    def __init__(self):
+        self._location: str | None = None
+
+    @property
+    def location(self) -> str:
+        """
+        The location of where the memory is regarding the memory transfer.
+        Returns:
+            ``'src'`` or ``'dst'`` depending on if it is the source or destination of the memory copy.
+        """
+        if self._location is None:
+            raise ValueError("The location is not set, make sure to set it before use.")
+        return self._location
+
+    @location.setter
+    def location(self, value: str):
+        """
+        The location the memory is in regarding the memory transfer.
+        Args:
+            value: Can only be ``'src'`` or ``'dst'``.
+
+                - ``'src'`` represents the source of the memory copy.
+
+                - ``'dst'`` represents the destination of the memory copy.
+        """
+        if value not in self.location_options:
+            raise ValueError("An invalid location was parsed")
+        self._location = value
 
     def copy_args(self, *args, **kwargs) -> dict:
         raise NotImplementedError("This function needs to be implemented in a subclass.")
@@ -20,7 +48,7 @@ class Host(__Location):
     Represents the host in memory copies on HIP.
     """
     memory_type = hip.hipMemoryType.hipMemoryTypeHost
-    location: str
+
     T = TypeVar('T', bound=npt.NDArray)
 
     def __init__(self, array: npt.NDArray[T]):
@@ -29,6 +57,7 @@ class Host(__Location):
         Args:
             array: A numpy array to represent the host array to copy to/from.
         """
+        super().__init__()
         self.array = array
         self.pitch = self.array.strides[0]
 
@@ -51,7 +80,6 @@ class Device(__Location):
     Represents the device in memory copies on HIP.
     """
     memory_type = hip.hipMemoryType.hipMemoryTypeDevice
-    location: str
 
     def __init__(self, pointer: Pointer, pitch: int, dtype: np.float32 | np.float64, x=0, y=0):
         """
@@ -63,6 +91,7 @@ class Device(__Location):
             x: The element on the x dimension in the array on the device.
             y: The element on the y dimension in the array on the device.
         """
+        super().__init__()
         self.pointer = pointer
         self.pitch = pitch
         self.x = x
@@ -115,7 +144,7 @@ class Transfer:
             'Height': self.height
         }
 
-        kwargs += self.src.copy_args()
-        kwargs += self.dst.copy_args()
+        kwargs.update(self.src.copy_args())
+        kwargs.update(self.dst.copy_args())
 
-        return hip.hip_Memcpy2D(kwargs)
+        return hip.hip_Memcpy2D(**kwargs)

@@ -26,8 +26,7 @@ class HIPArray2D(BaseArray2D):
         """
 
         super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision, integers)
-        shape_x = self.shape[0]
-        shape_y = self.shape[1]
+        shape_y, shape_x = self.shape
 
         self.width = shape_x * self.bytes_per_float
         self.height = shape_y
@@ -37,16 +36,13 @@ class HIPArray2D(BaseArray2D):
         malloc: tuple[Pointer, int] = hip_check(hip.hipMallocPitch(self.width, self.height))
         self.data, self.pitch = malloc
 
-        hip_check(hip.hipMemcpy2DAsync(self.data, self.pitch,
-                                       self.__host_data, data.strides[0],
-                                       self.width, self.height,
-                                       hip.hipMemcpyKind.hipMemcpyHostToDevice, gpu_stream.pointer))
+        hip_check(hip.hipMemcpy2DAsync(dst=self.data, dpitch=self.pitch,
+                                       src=self._host_data, spitch=self._host_data.strides[0],
+                                       width=self.width, height=self.height,
+                                       kind=hip.hipMemcpyKind.hipMemcpyHostToDevice, stream=gpu_stream.pointer))
 
         # FIXME: This could be potentially dangerous as it could be deleting the entire array before the copy has been completed.
-        self.__host_data = None
-
-    def __del__(self, *args):
-        hip_check(hip.hipFree(self.data))
+        self._host_data = None
 
     def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
@@ -56,9 +52,9 @@ class HIPArray2D(BaseArray2D):
             self.mask = data.mask
 
         # Make sure that the input is of correct size:
-        host_data = self.__convert_to_precision(data)
+        host_data = self._convert_to_precision(data)
 
-        self.__check(host_data.shape, host_data.itemsize)
+        self._check(host_data.shape, host_data.itemsize)
 
         # Parameters to copy to GPU memory
         src = Host(data)
@@ -75,11 +71,11 @@ class HIPArray2D(BaseArray2D):
         if not buffer.holds_data:
             raise RuntimeError('The provided buffer is either not allocated, or has been freed before copying buffer')
 
-        self.__check((buffer.ny_halo, buffer.nx_halo), buffer.bytes_per_float)
+        self._check(buffer.shape, buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
-        src = Device(self.data, self.pitch, self.dtype)
-        dst = Device(buffer.data, buffer.pitch, buffer.dtype)
+        src = Device(buffer.data, buffer.pitch, buffer.dtype)
+        dst = Device(self.data, self.pitch, self.dtype)
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
@@ -109,3 +105,8 @@ class HIPArray2D(BaseArray2D):
         hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
 
         return data
+
+    def release(self) -> None:
+        if self.holds_data:
+            hip_check(hip.hipFree(self.data))
+            self.holds_data = False

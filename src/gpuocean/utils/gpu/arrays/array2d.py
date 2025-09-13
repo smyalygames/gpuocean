@@ -26,8 +26,8 @@ class BaseArray2D(Generic[T]):
 
         self.double_precision = double_precision
         self.integers = integers
-        self.__host_data = self.__convert_to_precision(data)
-        self.dtype = self.__host_data.dtype
+        self._host_data = self._convert_to_precision(data)
+        self.dtype = self._host_data.dtype
 
         self.nx = nx
         self.ny = ny
@@ -38,15 +38,15 @@ class BaseArray2D(Generic[T]):
             self.nx_halo = nx + asym_halo[1] + asym_halo[3]
             self.ny_halo = ny + asym_halo[0] + asym_halo[2]
 
-        self.shape = (self.nx_halo, self.ny_halo)
+        self.shape = (self.ny_halo, self.nx_halo)
 
         # Make sure data is in proper format
-        if self.__host_data.shape != self.shape[::-1]:
+        if self._host_data.shape != self.shape:
             raise ValueError(
-                f"Wrong shape of data {str(self.__host_data.shape)} vs {str((self.ny, self.nx))} / "
+                f"Wrong shape of data {str(self._host_data.shape)} vs {str((self.ny, self.nx))} / "
                 + f"{str((self.ny_halo, self.nx_halo))}")
 
-        self.bytes_per_float = self.__host_data.itemsize
+        self.bytes_per_float = self._host_data.itemsize
 
         if (self.bytes_per_float != 4 and not double_precision) and (self.bytes_per_float != 8 and double_precision):
             raise ValueError("Wrong size of data type. It should an array of 32 or 64 bit floats.")
@@ -84,7 +84,7 @@ class BaseArray2D(Generic[T]):
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")
 
-    def __convert_to_precision(self, data: data_t) -> data_t:
+    def _convert_to_precision(self, data: data_t) -> data_t:
         """
         Converts the ``data`` given to the specified float precision.
         Args:
@@ -97,7 +97,7 @@ class BaseArray2D(Generic[T]):
         else:
             return convert_to_float32(data)
 
-    def __check(self, shape: tuple[int, ...], item_size: int) -> None:
+    def _check(self, shape: tuple[int, ...], item_size: int) -> None:
         """
         Checks if the 2D array to copy to GPU memory is of a correct format.
         Args:
@@ -108,6 +108,8 @@ class BaseArray2D(Generic[T]):
         """
         if len(shape) != 2:
             raise ValueError(f"Provided array is not a 2D array, got a {len(shape)} dimensional array instead.")
+
+        shape = shape
 
         ny_halo, nx_halo = shape
 
