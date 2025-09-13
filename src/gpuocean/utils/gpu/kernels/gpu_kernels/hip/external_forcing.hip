@@ -1,7 +1,7 @@
 
 
 #include <hip/hip_runtime.h>
-#include "interpolation.cu"
+#include "interpolation.hip"
 
 
 /**

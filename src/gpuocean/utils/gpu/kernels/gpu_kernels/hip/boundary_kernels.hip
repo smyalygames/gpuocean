@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
-#include "interpolation.cu"
+#include "common.hip"
+#include "interpolation.hip"
 
 
 

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "interpolation.cu"
+#include "interpolation.hip"
 
 
 __device__ float wind(const float* wind_current_arr, const float* wind_next_arr,

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
+#include "common.hip"
 
 //WARNING: Must match CDKLM16_kernel.cu and max_dt.cu
 //WARNING: This is error prone - as comparison with floating point numbers is not accurate

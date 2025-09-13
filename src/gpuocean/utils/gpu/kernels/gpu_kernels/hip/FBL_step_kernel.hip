@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
-#include "external_forcing.cu"
+#include "common.hip"
+#include "external_forcing.hip"
 
 // Finds the coriolis term based on the linear Coriolis force
 // f = \tilde{f} + beta*(y-y0)

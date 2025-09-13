@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
+#include "common.hip"
 
 // Boundary conditions are defined as
 // 1: Closed wall

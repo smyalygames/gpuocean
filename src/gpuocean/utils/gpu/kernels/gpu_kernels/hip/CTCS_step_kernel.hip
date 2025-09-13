@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
-#include "external_forcing.cu"
+#include "common.hip"
+#include "external_forcing.hip"
 
 
 /**

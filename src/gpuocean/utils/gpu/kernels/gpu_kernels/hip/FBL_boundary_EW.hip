@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <hip/hip_runtime.h>
-#include "common.cu"
+#include "common.hip"
 
 // Fix  east-west boundary before north-south (to get the corners right)
 // This is contrary to all the other BC kernels.
