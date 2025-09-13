@@ -30,7 +30,7 @@ class Context(object):
         self.logger = logging.getLogger(__name__)
         self.modules: dict[str, module_t] = {}
 
-        self.module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"{language}")
+        self.module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"gpu_kernels/{language}")
 
         # Creates cache directory if specified
         self.cache_path = os.path.join(get_project_root(), ".gpuocean_cache", str(language))

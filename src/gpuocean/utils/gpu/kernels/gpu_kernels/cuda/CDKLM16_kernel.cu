@@ -912,10 +912,11 @@ __global__ void cdklm_swe_2D(
                 const float hv_cor = up.x*hu_east_cor + up.y*hv_north_cor;
 
                 // Atmospheric pressure
+float2 atm_p_central_diff;
 #if USE_DIRECT_LOOKUP
-                const float2 atm_p_central_diff = atmospheric_pressure_central_diff_lookup(atmospheric_pressure_current_arr, atmospheric_pressure_next_arr, atmospheric_pressure_t_,  ti, tj, ATMOS_PRES_NX);
+                atm_p_central_diff = atmospheric_pressure_central_diff_lookup(atmospheric_pressure_current_arr, atmospheric_pressure_next_arr, atmospheric_pressure_t_,  ti, tj, ATMOS_PRES_NX);
 #else
-                const float2 atm_p_central_diff = atmospheric_pressure_central_diff(atmospheric_pressure_current_arr, atmospheric_pressure_next_arr, atmospheric_pressure_t_,  ti+0.5, tj+0.5, NX+4, NY+4, ATMOS_PRES_NX, ATMOS_PRES_NY);
+                atm_p_central_diff = atmospheric_pressure_central_diff(atmospheric_pressure_current_arr, atmospheric_pressure_next_arr, atmospheric_pressure_t_,  ti+0.5, tj+0.5, NX+4, NY+4, ATMOS_PRES_NX, ATMOS_PRES_NY);
 #endif
                 // TODO: We might want to use the mean of the reconstructed eta's at the faces here, instead of R[0]...
                 //const float bathymetry1 = GRAV*(R[0][j][i] + Hm)*H_x;
@@ -965,10 +966,12 @@ __global__ void cdklm_swe_2D(
         
         if (RK_ORDER < 3) {
 
+float C;
+
 #ifdef use_linear_friction
-            const float C = 2.0f*FRIC*dt_/(R[0][j][i] + Hm);
+             C = 2.0f*FRIC*dt_/(R[0][j][i] + Hm);
 #else
-            float C = 0.0;
+            C = 0.0;
             if (FRIC > 0.0) {
                 if (h < KPSIMULATOR_DESING_EPS) {
                     const float u = desingularize(h, hu, KPSIMULATOR_DESING_EPS);

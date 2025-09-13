@@ -124,7 +124,7 @@ __global__ void closedBoundaryVKernel_NS(
     if (ti < nx_ + 2) {
         
         if ((tj == 1 ) && (bc_south_ == 1)) {
-            V_row[ti] == 0.0f;
+            V_row[ti] = 0.0f;
         }
         
        if ((tj == ny_+1) && (bc_north_ == 1)) {
