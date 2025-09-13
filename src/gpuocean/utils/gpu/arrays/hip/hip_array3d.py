@@ -37,7 +37,7 @@ class HIPArray3D(BaseArray3D):
 
         self.__pos = hip.hipPos(x=0, y=0, z=0)
 
-        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self.__host_data,
+        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self._host_data,
                                            dstPos=self.__pos, dstPtr=self.data,
                                            kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
 
@@ -45,7 +45,7 @@ class HIPArray3D(BaseArray3D):
 
         # FIXME: This may be dangerous, as the array may be deleted when the memory copy to the GPU occurs.
         #  This should be tested.
-        self.__host_data = None
+        self._host_data = None
 
     @property
     def pointer(self) -> hip.hipPitchedPtr:
@@ -59,9 +59,9 @@ class HIPArray3D(BaseArray3D):
             self.mask = data.mask
 
         # Make sure that the input is of correct size:
-        host_data = self.__convert_to_precision(data)
+        host_data = self._convert_to_precision(data)
 
-        self.__check(host_data.shape, host_data.itemsize)
+        self._check(host_data.shape, host_data.itemsize)
 
         # Parameters to copy to GPU memory
         copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=data,
@@ -77,7 +77,7 @@ class HIPArray3D(BaseArray3D):
         if not buffer.holds_data:
             raise RuntimeError('The provided buffer is either not allocated, or has been freed before copying buffer')
 
-        self.__check(buffer.shape[::-1], buffer.bytes_per_float)
+        self._check(buffer.shape[::-1], buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
         copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=buffer.data,

@@ -25,15 +25,15 @@ class BaseArray3D(Generic[T]):
         """
 
         self.double_precision = double_precision
-        self.__host_data = self.__convert_to_precision(data)
-        self.dtype = self.__host_data.dtype
+        self._host_data = self._convert_to_precision(data)
+        self.dtype = self._host_data.dtype
 
         self.nx = nx
         self.ny = ny
         self.nc = nc
         self.shape = (self.ny, self.nx, self.nc)
 
-        self.bytes_per_float = self.__host_data.itemsize
+        self.bytes_per_float = self._host_data.itemsize
 
         # Checking the format of the data
         if self.shape[1] != self.nx:
@@ -42,7 +42,7 @@ class BaseArray3D(Generic[T]):
             raise TypeError(f"{self.shape[0]} vs {str(self.ny)}")
         if self.shape[2] != self.nc:
             raise TypeError(f"{self.shape[2]} vs {str(self.nc)}")
-        if data.shape != self.shape[::-1]:
+        if data.shape != self.shape:
             raise TypeError(
                 f"The shape of the array ({str(data.shape)} does not match the given conditions ({str((self.ny, self.nx, self.nc))}).")
 
@@ -88,7 +88,7 @@ class BaseArray3D(Generic[T]):
         """
         raise NotImplementedError("This function needs to be implemented in a subclass.")
 
-    def __convert_to_precision(self, data: data_t) -> data_t:
+    def _convert_to_precision(self, data: data_t) -> data_t:
         """
         Converts the ``data`` given to the specified float precision.
         Args:
@@ -101,7 +101,7 @@ class BaseArray3D(Generic[T]):
         else:
             return convert_to_float32(data)
 
-    def __check(self, shape: tuple[int, ...], item_size: int) -> None:
+    def _check(self, shape: tuple[int, ...], item_size: int) -> None:
         """
         Checks if the 3D array to copy to GPU memory is of a correct format.
         Args:

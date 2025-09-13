@@ -26,9 +26,9 @@ class CudaArray3D(BaseArray3D):
         super().__init__(gpu_stream, nx, ny, nc, data, double_precision, integers)
 
         # Upload data to the device
-        self.data = pycuda.gpuarray.to_gpu_async(self.__host_data, stream=gpu_stream.pointer)
+        self.data = pycuda.gpuarray.to_gpu_async(self._host_data, stream=gpu_stream.pointer)
         self.holds_data = True
-        self.__host_data = None
+        self._host_data = None
 
     @property
     def pointer(self) -> cuda.DeviceAllocation:
@@ -42,9 +42,9 @@ class CudaArray3D(BaseArray3D):
             self.mask = data.mask
 
         # Make sure that the input is of correct size:
-        host_data = self.__convert_to_precision(data)
+        host_data = self._convert_to_precision(data)
 
-        self.__check(host_data.shape, host_data.itemsize)
+        self._check(host_data.shape, host_data.itemsize)
 
         # Okay, everything is fine, now upload:
         self.data.set_async(host_data, stream=gpu_stream.pointer)
@@ -56,7 +56,7 @@ class CudaArray3D(BaseArray3D):
         if not buffer.holds_data:
             raise RuntimeError('The provided buffer is either not allocated, or has been freed before copying buffer')
 
-        self.__check(buffer.shape[::-1], buffer.bytes_per_float)
+        self._check(buffer.shape[::-1], buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
         total_num_bytes = self.bytes_per_float * self.nx * self.ny * self.nc
