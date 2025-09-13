@@ -4,11 +4,27 @@ import logging
 from hashlib import md5
 from enum import Enum, auto
 from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
 from gpuocean.utils.utils import get_project_root, get_includes
 
 if TYPE_CHECKING:
     from .. import module_t
+
+@dataclass
+class DeviceInfo:
+    """
+    A helper class to unify the way of getting information on a device regardless of their API.
+    Args:
+        device: Device ID of the GPU
+        name: Name of the GPU
+        api_version: Version of CUDA or HIP
+        driver_version: Version of drivers for the GPU
+    """
+    device: int
+    name: str
+    api_version: str
+    driver_version: str
 
 
 class Context(object):

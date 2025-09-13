@@ -29,7 +29,7 @@ import pycuda.gpuarray
 import pycuda.driver as cuda
 
 from gpuocean.utils.timer import Timer
-from ..context import Context
+from ..context import Context, DeviceInfo
 
 
 class CudaContext(Context):
@@ -47,7 +47,7 @@ class CudaContext(Context):
             use_cache: Caches the kernels after they are compiled.
         """
 
-        super().__init__(Context.Architecture.CUDA, device, context_flags, use_cache)
+        super().__init__(self.Architecture.CUDA, device, context_flags, use_cache)
 
         self.device = device
 
@@ -61,12 +61,15 @@ class CudaContext(Context):
             self.device = self.device % cuda.Device.count()
             self.logger.debug(f"Changing device ID from {str(device)} to {str(self.device)}")
 
-        # Print some info about CUDA
-        self.logger.info(f"CUDA version {str(cuda.get_version())}")
-        self.logger.info(f"Driver version {str(cuda.get_driver_version())}")
-
         self.cuda_device = cuda.Device(self.device)
-        self.logger.info(f"Using {self.cuda_device.name()} GPU")
+        self.device_info = DeviceInfo(self.device, self.cuda_device.name(), str(cuda.get_version()),
+                                      str(cuda.get_driver_version()))
+
+        # Print some info about CUDA
+        self.logger.info(f"CUDA version {self.device_info.api_version}")
+        self.logger.info(f"Driver version {self.device_info.driver_version}")
+
+        self.logger.info(f"Using {self.device_info.name} GPU")
         self.logger.debug(f" => compute capability: {str(self.cuda_device.compute_capability())}")
         free, total = cuda.mem_get_info()
         self.logger.debug(f" => memory: {int(free / (1024 * 1024))} / {int(total / (1024 * 1024))} MB available")
@@ -151,8 +154,8 @@ class CudaContext(Context):
         if not 'arch' in compile_args.keys():
             # HACK: Since CUDA 11.1 does not know about newer compute architectures that 8.6
             if ((cuda.Device(self.device).get_attribute(cuda.device_attribute.COMPUTE_CAPABILITY_MAJOR) > 8) or
-                (cuda.Device(self.device).get_attribute(cuda.device_attribute.COMPUTE_CAPABILITY_MAJOR) == 8  and
-                cuda.Device(self.device).get_attribute(cuda.device_attribute.COMPUTE_CAPABILITY_MINOR) > 6) ):
+                    (cuda.Device(self.device).get_attribute(cuda.device_attribute.COMPUTE_CAPABILITY_MAJOR) == 8 and
+                     cuda.Device(self.device).get_attribute(cuda.device_attribute.COMPUTE_CAPABILITY_MINOR) > 6)):
                 compile_args['arch'] = "sm_80"
 
         compile_args = compile_args.get('')

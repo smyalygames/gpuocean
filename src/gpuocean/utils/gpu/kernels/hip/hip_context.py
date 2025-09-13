@@ -5,7 +5,7 @@ import os.path
 import hip as hip_main
 from hip import hip, hiprtc
 
-from ..context import Context
+from ..context import Context, DeviceInfo
 from ...hip_utils import hip_check
 from gpuocean.utils.timer import Timer
 
@@ -24,11 +24,14 @@ class HIPContext(Context):
             context_flags: Does nothing.
             use_cache: Uses previously compiled kernel cache.
         """
-        super().__init__(Context.Architecture.HIP, device, context_flags, use_cache)
+        super().__init__(self.Architecture.HIP, device, context_flags, use_cache)
+
+        hip_version = hip_main.HIP_VERSION_NAME
+        rocm_version = hip_main.ROCM_VERSION_NAME
 
         # Log information about HIP version
-        self.logger.info(f"HIP Python version {hip_main.HIP_VERSION_NAME}")
-        self.logger.info(f"ROCm version {hip_main.ROCM_VERSION_NAME}")
+        self.logger.info(f"HIP Python version {hip_version}")
+        self.logger.info(f"ROCm version {rocm_version}")
 
         if device is None:
             device = 0
@@ -39,9 +42,11 @@ class HIPContext(Context):
         props = hip.hipDeviceProp_t()
         hip_check(hip.hipGetDeviceProperties(props, device))
         device_count = hip_check(hip.hipGetDeviceCount())
+        self.device_info = DeviceInfo(device, props.name.decode(), hip_version, rocm_version)
         self.arch = props.gcnArchName
+
         self.logger.info(
-            f"Using device {device}/{device_count} '{props.name.decode()} ({self.arch.decode()})'"
+            f"Using device {device}/{device_count} '{self.device_info.name} ({self.arch.decode()})'"
             + f" ({props.pciBusID})"
         )
         self.logger.debug(f" => total available memory: {int(props.totalGlobalMem / pow(1024, 2))} MiB")
