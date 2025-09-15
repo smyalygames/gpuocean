@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from hip import hip
+from hip._util.types import Pointer
 
 from ...hip_utils import hip_check
 from ..array3d import BaseArray3D
@@ -35,21 +36,31 @@ class HIPArray3D(BaseArray3D):
         # Allocating memory
         hip_check(hip.hipMalloc3D(self.data, self.extent))
 
-        self.__pos = hip.hipPos(x=0, y=0, z=0)
+        copy_params = hip.HIP_MEMCPY3D(srcHost=self._host_data, srcPitch=self._host_data.strides[0],
+                                       srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
 
-        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self._host_data,
-                                           dstPos=self.__pos, dstPtr=self.data,
-                                           kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
+                                       dstDevice=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
-        hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
+                                       WidthInBytes=self.bytes_per_float * self.extent.width,
+                                       Height=self.extent.height,
+                                       Depth=self.extent.depth)
+
+        hip_check(hip.hipDrvMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
         # FIXME: This may be dangerous, as the array may be deleted when the memory copy to the GPU occurs.
         #  This should be tested.
         self._host_data = None
 
     @property
-    def pointer(self) -> hip.hipPitchedPtr:
-        return self.data
+    def pointer(self) -> Pointer:
+        """Pointer for the array on the device/GPU."""
+        return self.data.ptr
+
+    @property
+    def pitch(self) -> int:
+        """The pitch on the device/GPU."""
+        return self.data.pitch
 
     def upload(self, gpu_stream: HIPStream, data: data_t):
         if not self.holds_data:
@@ -64,9 +75,15 @@ class HIPArray3D(BaseArray3D):
         self._check(host_data.shape, host_data.itemsize)
 
         # Parameters to copy to GPU memory
-        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=data,
-                                           dstPos=self.__pos, dstPtr=self.data,
-                                           kind=hip.hipMemcpyKind.hipMemcpyHostToDevice)
+        copy_params = hip.HIP_MEMCPY3D(srcHost=data, srcPitch=data.strides[0],
+                                       srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
+
+                                       dstDevice=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
+
+                                       WidthInBytes=self.bytes_per_float * self.extent.width,
+                                       Height=self.extent.height,
+                                       Depth=self.extent.depth)
 
         hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
@@ -80,9 +97,15 @@ class HIPArray3D(BaseArray3D):
         self._check(buffer.shape[::-1], buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
-        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=buffer.data,
-                                           dstPos=self.__pos, dstPtr=self.data,
-                                           kind=hip.hipMemcpyKind.hipMemcpyDeviceToDevice)
+        copy_params = hip.HIP_MEMCPY3D(srcDevice=buffer.data.ptr, srcPitch=buffer.data.pitch,
+                                       srcMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
+
+                                       dstHost=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
+
+                                       WidthInBytes=self.bytes_per_float * self.extent.width,
+                                       Height=self.extent.height,
+                                       Depth=self.extent.depth)
 
         hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
@@ -102,9 +125,15 @@ class HIPArray3D(BaseArray3D):
         data_h = np.zeros(self.shape, dtype=self.dtype)
 
         # Parameters to copy from GPU memory
-        copy_params = hip.hipMemcpy3DParms(srcPos=self.__pos, srcPtr=self.data,
-                                           dstPos=self.__pos, dstPtr=data_h,
-                                           kind=hip.hipMemcpyKind.hipMemcpyDeviceToHost)
+        copy_params = hip.HIP_MEMCPY3D(srcDevice=self.data.ptr, srcPitch=self.data.pitch,
+                                       srcMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
+
+                                       dstHost=data_h, dstPitch=data_h.strides[0],
+                                       dstMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
+
+                                       WidthInBytes=self.bytes_per_float * self.extent.width,
+                                       Height=self.extent.height,
+                                       Depth=self.extent.depth)
 
         hip_check(hip.hipMemcpy3DAsync(copy_params, gpu_stream.pointer))
 
