@@ -143,4 +143,3 @@ class HIPArray3D(BaseArray3D):
         if self.holds_data:
             hip_check(hip.hipFree(self.data))
             self.holds_data = False
-
