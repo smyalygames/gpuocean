@@ -55,6 +55,10 @@ class BaseArray3D(Generic[T]):
         if np.ma.is_masked(data):
             self.mask = data.mask
 
+    def __del__(self):
+        if self.holds_data:
+            self.release()
+
     @property
     def pointer(self):
         """
