@@ -34,6 +34,8 @@ import logging
 import gc
 import warnings
 import functools
+from enum import Enum
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -255,15 +257,42 @@ def deprecated(func):
 
     return new_func
 
+class BoundaryType(Enum):
+    NONE = np.int32(0)
+    WALL = np.int32(1)
+    PERIODIC = np.int32(2)
+    FLOW_RELAXATION_SCHEME = np.int32(3)
+    OPEN_LINEAR_INTERPOLATION = np.int32(4)
+
+    def __str__(self):
+        return self.name.title()
+
+@dataclass
+class SpongeCells:
+    north: int
+    east: int
+    south: int
+    west: int
+
+    def __post_init__(self):
+        self.north: np.int32 = np.int32(self.north)
+        self.east: np.int32 = np.int32(self.east)
+        self.south: np.int32 = np.int32(self.south)
+        self.west: np.int32 = np.int32(self.west)
+
+    def __str__(self):
+        return f"SpongeCells: {{north: {self.north}, east: {self.east}, south: {self.south}, west: {self.west}}}"
+
 
 class BoundaryConditions:
     """
-    Class that represents different forms for boundary conidtions
+    Class that represents different forms for boundary conditions
     """
 
     def __init__(self,
-                 north=1, east=1, south=1, west=1,
-                 sponge_cells: dict[str, int] = None):
+                 north: BoundaryType=BoundaryType.WALL, east: BoundaryType=BoundaryType.WALL,
+                 south: BoundaryType=BoundaryType.WALL, west: BoundaryType=BoundaryType.WALL,
+                 sponge_cells: SpongeCells = None):
         """
         There is one parameter for each of the cartesian boundaries.
         Values can be set as follows:
@@ -274,22 +303,18 @@ class BoundaryConditions:
         Options 3 and 4 are of sponge type (requiring extra computational domain)
         """
         if sponge_cells is None:
-            sponge_cells = {'north': 0, 'south': 0, 'east': 0, 'west': 0}
-        self.north = np.int32(north)
-        self.east = np.int32(east)
-        self.south = np.int32(south)
-        self.west = np.int32(west)
+            sponge_cells = SpongeCells(0, 0, 0, 0)
+        self.north = north
+        self.east = east
+        self.south = south
+        self.west = west
         self.spongeCells = sponge_cells
 
-        # Quick and dirty make sure sponge cells are int32
-        for key in self.spongeCells.keys():
-            self.spongeCells[key] = np.int32(self.spongeCells[key])
-
         # Checking that periodic boundaries are periodic
-        assert not ((self.north == 2 or self.south == 2) and
+        assert not ((self.north == BoundaryType.PERIODIC or self.south == BoundaryType.PERIODIC) and
                     (self.north != self.south)), \
             'The given periodic boundary conditions are not periodically (north/south)'
-        assert not ((self.east == 2 or self.west == 2) and
+        assert not ((self.east == BoundaryType.PERIODIC or self.west == BoundaryType.PERIODIC) and
                     (self.east != self.west)), \
             'The given periodic boundary conditions are not periodically (east/west)'
 
@@ -307,61 +332,44 @@ class BoundaryConditions:
         return self.spongeCells
 
     def isDefault(self):
-        return (self.north == 1 and
-                self.east == 1 and
-                self.south == 1 and
-                self.east == 1)
+        return (self.north == BoundaryType.WALL and
+                self.east == BoundaryType.WALL and
+                self.south == BoundaryType.WALL and
+                self.east == BoundaryType.WALL)
 
     def isSponge(self):
-        return (self.north == 3 or self.north == 4 or
-                self.east == 3 or self.east == 4 or
-                self.south == 3 or self.south == 4 or
-                self.west == 3 or self.west == 4)
+        return (self.north == BoundaryType.FLOW_RELAXATION_SCHEME or self.north == BoundaryType.OPEN_LINEAR_INTERPOLATION or
+                self.east == BoundaryType.FLOW_RELAXATION_SCHEME or self.east == BoundaryType.OPEN_LINEAR_INTERPOLATION or
+                self.south == BoundaryType.FLOW_RELAXATION_SCHEME or self.south == BoundaryType.OPEN_LINEAR_INTERPOLATION or
+                self.west == BoundaryType.FLOW_RELAXATION_SCHEME or self.west == BoundaryType.OPEN_LINEAR_INTERPOLATION)
 
     def isPeriodicNorthSouth(self):
-        return self.north == 2 and self.south == 2
+        return self.north == BoundaryType.PERIODIC and self.south == BoundaryType.PERIODIC
 
     def isPeriodicEastWest(self):
-        return self.east == 2 and self.west == 2
+        return self.east == BoundaryType.PERIODIC and self.west == BoundaryType.PERIODIC
 
     def isPeriodic(self):
         return self.isPeriodicEastWest() and self.isPeriodicNorthSouth()
 
-    @staticmethod
-    def _to_string(cond: int):
-        if cond == 1:
-            return "Wall"
-        elif cond == 2:
-            return "Periodic"
-        elif cond == 3:
-            return "Flow_Relaxation_Scheme"
-        elif cond == 4:
-            return "Open_Linear_Interpolation"
-        else:
-            return "Invalid_:|"
-
     def __str__(self):
-        msg = "north: " + self._to_string(self.north) + \
-              ", east: " + self._to_string(self.east) + \
-              ", south: " + self._to_string(self.south) + \
-              ", west: " + self._to_string(self.west)
-        msg = msg + ", spongeCells: " + str(self.spongeCells)
+        msg = f"north: {self.north}, east: {self.east}, south: {self.south}, west: {self.west}, {self.spongeCells}"
         return msg
 
     @classmethod
-    def fromstring(cls, bc_string: str):
+    def fromstring(cls, bc_string: str) -> BoundaryConditions:
 
-        def keyword_to_cond(key):
-            if key == 'Wall':
-                return 1
-            elif key == 'Periodic':
-                return 2
-            elif key == 'Flow_Relaxation_Scheme':
-                return 3
-            elif key == 'Open_Linear_Interpolation':
-                return 4
+        def keyword_to_cond(key: str) -> BoundaryType:
+            if key == str(BoundaryType.WALL):
+                return BoundaryType.WALL
+            elif key == str(BoundaryType.PERIODIC):
+                return BoundaryType.PERIODIC
+            elif key == str(BoundaryType.FLOW_RELAXATION_SCHEME):
+                return BoundaryType.FLOW_RELAXATION_SCHEME
+            elif key == str(BoundaryType.OPEN_LINEAR_INTERPOLATION):
+                return BoundaryType.OPEN_LINEAR_INTERPOLATION
             else:
-                return -1
+                return BoundaryType.NONE
 
         # clean string
         bc_clean_str = bc_string.replace(',', '').replace('}', '').replace('{', '').replace('[', '').replace(']',
@@ -375,15 +383,16 @@ class BoundaryConditions:
         west = keyword_to_cond(bc_array[7])
 
         if len(bc_array) > 13:
-            sponge_cells = {bc_array[9]: int(bc_array[10]),
-                            bc_array[11]: int(bc_array[12]),
-                            bc_array[13]: int(bc_array[14]),
-                            bc_array[15]: int(bc_array[16])}
+            sponge_cells = {bc_array[9]: np.int32(bc_array[10]),
+                            bc_array[11]: np.int32(bc_array[12]),
+                            bc_array[13]: np.int32(bc_array[14]),
+                            bc_array[15]: np.int32(bc_array[16])}
+            sponge_cells = SpongeCells(**sponge_cells)
         else:
-            sponge_cells = {'north': int(bc_array[9]),
-                            'east': int(bc_array[10]),
-                            'south': int(bc_array[11]),
-                            'west': int(bc_array[12])}
+            sponge_cells = SpongeCells(np.int32(bc_array[9]),
+                            np.int32(bc_array[10]),
+                            np.int32(bc_array[11]),
+                            np.int32(bc_array[12]))
 
         return cls(north=north, east=east, south=south, west=west, sponge_cells=sponge_cells)
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pycuda.driver as cuda
@@ -17,7 +18,7 @@ class CudaEvent(BaseEvent):
         super().__init__()
         self.event = cuda.Event()
 
-    def record(self, stream: cuda.Stream):
+    def record(self, stream: cuda.Stream) -> None:
         """
         Insert a recording point into the ``stream``.
 
@@ -26,13 +27,13 @@ class CudaEvent(BaseEvent):
         """
         self.event.record(stream)
 
-    def synchronize(self):
+    def synchronize(self) -> None:
         """
         Wait for the event to complete.
         """
         self.event.synchronize()
 
-    def time_since(self, start: cuda.Event) -> float:
+    def time_since(self, start: cuda.Event | CudaEvent) -> float:
         """
         Return the elapsed time from the ``start`` event and this class.
 
@@ -42,4 +43,7 @@ class CudaEvent(BaseEvent):
         Returns:
             Time since the ``start`` event and the end time of this class.
         """
+        if isinstance(start, CudaEvent):
+            start = start.event
+
         return self.event.time_since(start)
