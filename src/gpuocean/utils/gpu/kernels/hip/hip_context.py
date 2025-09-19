@@ -158,7 +158,7 @@ class HIPContext(Context):
                 code = bytearray(code_size)
                 hip_check(hiprtc.hiprtcGetCode(prog, code))
 
-                hip_check(hiprtc.hiprtcDestroyProgram(prog))
+                hip_check(hiprtc.hiprtcDestroyProgram(prog.createRef()))
 
                 module: hip.ihipModule_t = hip_check(hip.hipModuleLoadData(code))
 
