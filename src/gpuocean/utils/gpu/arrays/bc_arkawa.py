@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 
-from gpuocean.utils.Common import BoundaryConditionsData
+from gpuocean.utils.Common import BoundaryConditionsData, BoundaryType, SingleBoundaryConditionData
 
 from .. import Array3D, GPUHandler
 
@@ -29,10 +29,10 @@ class BoundaryConditionsArakawaA:
 
         self.boundary_conditions = boundary_conditions
 
-        self.nx = np.int32(nx)
-        self.ny = np.int32(ny)
-        self.halo_x = np.int32(halo_x)
-        self.halo_y = np.int32(halo_y)
+        self.nx = nx
+        self.ny = ny
+        self.halo_x = halo_x
+        self.halo_y = halo_y
         self.bc_data = bc_data
         # print("boundary (ny, nx: ", (self.ny, self.nx))
         # print("boundary (halo_y, halo_x): ", (self.halo_y, self.halo_x))
@@ -82,16 +82,16 @@ class BoundaryConditionsArakawaA:
 
     def update_bc_values(self, gpu_stream: GPUStream, t: float):
         # Only if we use flow relaxation
-        if not (self.boundary_conditions.north == 3 or
-                self.boundary_conditions.south == 3 or
-                self.boundary_conditions.east == 3 or
-                self.boundary_conditions.west == 3):
+        if not (self.boundary_conditions.north == BoundaryType.FLOW_RELAXATION_SCHEME or
+                self.boundary_conditions.south == BoundaryType.FLOW_RELAXATION_SCHEME or
+                self.boundary_conditions.east == BoundaryType.FLOW_RELAXATION_SCHEME or
+                self.boundary_conditions.west == BoundaryType.FLOW_RELAXATION_SCHEME):
             return
 
         # Compute new t0 and t1
         t_max_index = len(self.bc_data.t) - 1
         t0_index = max(0, np.searchsorted(self.bc_data.t, t) - 1)
-        t1_index = min(t_max_index, np.searchsorted(self.bc_data.t, t))
+        t1_index = min(t_max_index, int(np.searchsorted(self.bc_data.t, t)))
         new_t0 = self.bc_data.t[t0_index]
         new_t1 = self.bc_data.t[t1_index]
 
@@ -105,7 +105,7 @@ class BoundaryConditionsArakawaA:
         self.logger.debug(f"Time indices: [{t0_index}, {t1_index}]")
         self.logger.debug(f"Time: {t}  New interval is [{new_t0}, {new_t1}], old was [{old_t0}, {old_t1}]")
 
-        def pack_data_ns(data, t_index):
+        def pack_data_ns(data: SingleBoundaryConditionData, t_index: int):
             h = data.h[t_index]
             hu = data.hu[t_index]
             hv = data.hv[t_index]
@@ -128,7 +128,7 @@ class BoundaryConditionsArakawaA:
 
             return NS_data
 
-        def pack_data_ew(data, t_index):
+        def pack_data_ew(data: SingleBoundaryConditionData, t_index: int):
             h = data.h[t_index]
             hu = data.hu[t_index]
             hv = data.hv[t_index]
@@ -168,7 +168,7 @@ class BoundaryConditionsArakawaA:
 
             gpu_stream.synchronize()
 
-        # If time interval has changed, upload new data
+        # If the time interval has changed, upload new data
         if new_t0 != old_t0:
             upload("T0", t0_index)
 
@@ -178,91 +178,91 @@ class BoundaryConditionsArakawaA:
         # Update the bc_t linear interpolation coefficient
         elapsed_since_t0 = (t - new_t0)
         time_interval = max(1.0e-10, (new_t1 - new_t0))
-        self.bc_t = np.float32(max(0.0, min(1.0, elapsed_since_t0 / time_interval)))
+        self.bc_t = float(max(0.0, min(1.0, elapsed_since_t0 / time_interval)))
         self.logger.debug("Interpolation t is %f", self.bc_t)
 
-    def boundaryCondition(self, gpu_stream, h, u, v):
-        if self.boundary_conditions.north == 2:
+    def boundaryCondition(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
+        if self.boundary_conditions.north == BoundaryType.PERIODIC:
             self.periodic_boundary_NS(gpu_stream, h, u, v)
         else:
-            if self.boundary_conditions.north == 3 or self.boundary_conditions.south == 3:
+            if self.boundary_conditions.north == BoundaryType.FLOW_RELAXATION_SCHEME or self.boundary_conditions.south == BoundaryType.FLOW_RELAXATION_SCHEME:
                 self.flow_relaxation_NS(gpu_stream, h, u, v)
-            if self.boundary_conditions.north == 4 or self.boundary_conditions.south == 4:
+            if self.boundary_conditions.north == BoundaryType.OPEN_LINEAR_INTERPOLATION or self.boundary_conditions.south == BoundaryType.OPEN_LINEAR_INTERPOLATION:
                 self.linear_interpolation_NS(gpu_stream, h, u, v)
 
-        if self.boundary_conditions.east == 2:
+        if self.boundary_conditions.east == BoundaryType.PERIODIC:
             self.periodic_boundary_EW(gpu_stream, h, u, v)
         else:
-            if self.boundary_conditions.east == 3 or self.boundary_conditions.west == 3:
+            if self.boundary_conditions.east == BoundaryType.FLOW_RELAXATION_SCHEME or self.boundary_conditions.west == BoundaryType.FLOW_RELAXATION_SCHEME:
                 self.flow_relaxation_EW(gpu_stream, h, u, v)
-            if self.boundary_conditions.east == 4 or self.boundary_conditions.west == 4:
+            if self.boundary_conditions.east == BoundaryType.OPEN_LINEAR_INTERPOLATION or self.boundary_conditions.west == BoundaryType.OPEN_LINEAR_INTERPOLATION:
                 self.linear_interpolation_EW(gpu_stream, h, u, v)
 
-    def periodic_boundary_NS(self, gpu_stream: GPUStream, h, u, v):
+    def periodic_boundary_NS(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.__periodic_boundary(self.periodicBoundary_NS, gpu_stream, h, u, v)
 
-    def periodic_boundary_EW(self, gpu_stream: GPUStream, h, v, u):
+    def periodic_boundary_EW(self, gpu_stream: GPUStream, h: Array3D, v: Array3D, u: Array3D):
         self.__periodic_boundary(self.periodicBoundary_EW, gpu_stream, h, u, v)
 
-    def __periodic_boundary(self, funct: GPUHandler, gpu_stream: GPUStream, h, u, v):
+    def __periodic_boundary(self, funct: GPUHandler, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         funct.async_call(
             self.global_size, self.local_size, gpu_stream,
             [self.nx, self.ny,
-            self.halo_x, self.halo_y,
-            h.pointer, h.pitch,
-            u.pointer, u.pitch,
-            v.pointer, v.pitch])
+             self.halo_x, self.halo_y,
+             h.pointer, h.pitch,
+             u.pointer, u.pitch,
+             v.pointer, v.pitch])
 
-    def linear_interpolation_NS(self, gpu_stream, h, u, v):
+    def linear_interpolation_NS(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.linearInterpolation_NS.async_call(
             self.global_size, self.local_size, gpu_stream,
-            [self.boundary_conditions.north, self.boundary_conditions.south,
-            self.nx, self.ny,
-            self.halo_x, self.halo_y,
-            self.boundary_conditions.spongeCells['north'],
-            self.boundary_conditions.spongeCells['south'],
-            h.pointer, h.pitch,
-            u.pointer, u.pitch,
-            v.pointer, v.pitch])
+            [self.boundary_conditions.north.value, self.boundary_conditions.south.value,
+             self.nx, self.ny,
+             self.halo_x, self.halo_y,
+             self.boundary_conditions.spongeCells.north,
+             self.boundary_conditions.spongeCells.south,
+             h.pointer, h.pitch,
+             u.pointer, u.pitch,
+             v.pointer, v.pitch])
 
-    def linear_interpolation_EW(self, gpu_stream, h, u, v):
+    def linear_interpolation_EW(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.linearInterpolation_EW.async_call(
             self.global_size, self.local_size, gpu_stream,
-            [self.boundary_conditions.east, self.boundary_conditions.west,
-            self.nx, self.ny,
-            self.halo_x, self.halo_y,
-            self.boundary_conditions.spongeCells['east'],
-            self.boundary_conditions.spongeCells['west'],
-            h.pointer, h.pitch,
-            u.pointer, u.pitch,
-            v.pointer, v.pitch])
+            [self.boundary_conditions.east.value, self.boundary_conditions.west.value,
+             self.nx, self.ny,
+             self.halo_x, self.halo_y,
+             self.boundary_conditions.spongeCells.east,
+             self.boundary_conditions.spongeCells.west,
+             h.pointer, h.pitch,
+             u.pointer, u.pitch,
+             v.pointer, v.pitch])
 
-    def flow_relaxation_NS(self, gpu_stream, h, u, v):
+    def flow_relaxation_NS(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.flowRelaxationScheme_NS.async_call(
             self.global_size, self.local_size, gpu_stream,
-            [self.boundary_conditions.north, self.boundary_conditions.south,
-            self.nx, self.ny,
-            self.halo_x, self.halo_y,
-            self.boundary_conditions.spongeCells['north'],
-            self.boundary_conditions.spongeCells['south'],
-            h.pointer, h.pitch,
-            u.pointer, u.pitch,
-            v.pointer, v.pitch,
-            self.bc_NS_current_arr.pointer,
-            self.bc_NS_next_arr.pointer,
-            self.bc_t])
+            [self.boundary_conditions.north.value, self.boundary_conditions.south.value,
+             self.nx, self.ny,
+             self.halo_x, self.halo_y,
+             self.boundary_conditions.spongeCells.north,
+             self.boundary_conditions.spongeCells.south,
+             h.pointer, h.pitch,
+             u.pointer, u.pitch,
+             v.pointer, v.pitch,
+             self.bc_NS_current_arr.pointer,
+             self.bc_NS_next_arr.pointer,
+             self.bc_t])
 
-    def flow_relaxation_EW(self, gpu_stream, h, u, v):
+    def flow_relaxation_EW(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.flowRelaxationScheme_EW.async_call(
             self.global_size, self.local_size, gpu_stream,
-            [self.boundary_conditions.east, self.boundary_conditions.west,
-            self.nx, self.ny,
-            self.halo_x, self.halo_y,
-            self.boundary_conditions.spongeCells['east'],
-            self.boundary_conditions.spongeCells['west'],
-            h.pointer, h.pitch,
-            u.pointer, u.pitch,
-            v.pointer, v.pitch,
-            self.bc_EW_current_arr.pointer,
-            self.bc_EW_next_arr.pointer,
-            self.bc_t])
+            [self.boundary_conditions.east.value, self.boundary_conditions.west.value,
+             self.nx, self.ny,
+             self.halo_x, self.halo_y,
+             self.boundary_conditions.spongeCells.east,
+             self.boundary_conditions.spongeCells.west,
+             h.pointer, h.pitch,
+             u.pointer, u.pitch,
+             v.pointer, v.pitch,
+             self.bc_EW_current_arr.pointer,
+             self.bc_EW_next_arr.pointer,
+             self.bc_t])

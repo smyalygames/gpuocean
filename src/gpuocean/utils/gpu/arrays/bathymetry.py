@@ -5,7 +5,7 @@ from typing import Union, TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from gpuocean.utils.Common import BoundaryConditions
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 from .. import GPUHandler, Array2D
 
 if TYPE_CHECKING:
@@ -24,12 +24,12 @@ class Bathymetry:
                  block_width=16, block_height=16):
         # Convert scalar data to int32
         self.gpu_stream = gpu_stream
-        self.nx = np.int32(nx)
-        self.ny = np.int32(ny)
-        self.halo_x = np.int32(halo_x)
-        self.halo_y = np.int32(halo_y)
-        self.halo_nx = np.int32(nx + 2 * halo_x)
-        self.halo_ny = np.int32(ny + 2 * halo_y)
+        self.nx = nx
+        self.ny = ny
+        self.halo_x = halo_x
+        self.halo_y = halo_y
+        self.halo_nx = nx + 2 * halo_x
+        self.halo_ny = ny + 2 * halo_y
         self.boundary_conditions = boundary_conditions
 
         # Set land value (if masked array)
@@ -148,13 +148,13 @@ class Bathymetry:
                  self.Bi.pointer, self.Bi.pitch])
 
         # North-south:
-        if (self.boundary_conditions.north == 2) and (self.boundary_conditions.south == 2):
+        if (self.boundary_conditions.north == BoundaryType.PERIODIC) and (self.boundary_conditions.south == BoundaryType.PERIODIC):
             self.periodic_boundary_intersections_NS.async_call(*args)
-        elif (self.boundary_conditions.north == 1) and (self.boundary_conditions.south == 1):
+        elif (self.boundary_conditions.north == BoundaryType.WALL) and (self.boundary_conditions.south == BoundaryType.WALL):
             self.closed_boundary_intersections_NS.async_call(*args)
 
         # East-west:
-        if (self.boundary_conditions.east == 2) and (self.boundary_conditions.west == 2):
+        if (self.boundary_conditions.east == BoundaryType.PERIODIC) and (self.boundary_conditions.west == BoundaryType.PERIODIC):
             self.periodic_boundary_intersections_EW.async_call(*args)
-        elif (self.boundary_conditions.north == 1) and (self.boundary_conditions.south == 1):
+        elif (self.boundary_conditions.north == BoundaryType.WALL) and (self.boundary_conditions.south == BoundaryType.WALL):
             self.closed_boundary_intersections_EW.async_call(*args)

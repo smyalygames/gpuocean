@@ -34,7 +34,7 @@ import logging
 import gc
 import warnings
 import functools
-from enum import Enum
+from enum import IntEnum
 from dataclasses import dataclass
 
 import numpy as np
@@ -257,12 +257,11 @@ def deprecated(func):
 
     return new_func
 
-class BoundaryType(Enum):
-    NONE = np.int32(0)
-    WALL = np.int32(1)
-    PERIODIC = np.int32(2)
-    FLOW_RELAXATION_SCHEME = np.int32(3)
-    OPEN_LINEAR_INTERPOLATION = np.int32(4)
+class BoundaryType(IntEnum):
+    WALL = 1
+    PERIODIC = 2
+    FLOW_RELAXATION_SCHEME = 3
+    OPEN_LINEAR_INTERPOLATION = 4
 
     def __str__(self):
         return self.name.title()
@@ -273,12 +272,6 @@ class SpongeCells:
     east: int
     south: int
     west: int
-
-    def __post_init__(self):
-        self.north: np.int32 = np.int32(self.north)
-        self.east: np.int32 = np.int32(self.east)
-        self.south: np.int32 = np.int32(self.south)
-        self.west: np.int32 = np.int32(self.west)
 
     def __str__(self):
         return f"SpongeCells: {{north: {self.north}, east: {self.east}, south: {self.south}, west: {self.west}}}"
@@ -359,7 +352,7 @@ class BoundaryConditions:
     @classmethod
     def fromstring(cls, bc_string: str) -> BoundaryConditions:
 
-        def keyword_to_cond(key: str) -> BoundaryType:
+        def keyword_to_cond(key: str) -> BoundaryType | None:
             if key == str(BoundaryType.WALL):
                 return BoundaryType.WALL
             elif key == str(BoundaryType.PERIODIC):
@@ -369,7 +362,7 @@ class BoundaryConditions:
             elif key == str(BoundaryType.OPEN_LINEAR_INTERPOLATION):
                 return BoundaryType.OPEN_LINEAR_INTERPOLATION
             else:
-                return BoundaryType.NONE
+                return None
 
         # clean string
         bc_clean_str = bc_string.replace(',', '').replace('}', '').replace('{', '').replace('[', '').replace(']',
