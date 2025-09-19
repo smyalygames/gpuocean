@@ -25,19 +25,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 # Import packages we need
-import numpy as np
-
-from gpuocean.utils import Common, SimWriter
-from gpuocean.utils.gpu import GPUStream
-
-import gc
+from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import logging
+from typing import TYPE_CHECKING
+
+import numpy as np
+import numpy.typing as npt
+
+from gpuocean.utils import Common, SimWriter
+from gpuocean.utils.gpu import GPUStream, Array2D
 
 try:
     from importlib import reload
 except:
     pass
+
+if TYPE_CHECKING:
+    from mpi4py import MPI
+
+    from gpuocean.utils import WindStress, AtmosphericPressure
+    from gpuocean.utils.gpu import KernelContext, Array2D
 
 reload(Common)
 
@@ -49,23 +57,23 @@ class Simulator(object):
     __metaclass__ = ABCMeta
 
     def __init__(self,
-                 gpu_ctx,
-                 nx, ny,
-                 ghost_cells_x,
-                 ghost_cells_y,
-                 dx, dy, dt,
-                 g, f, r, A,
-                 t,
-                 theta, rk_order,
-                 coriolis_beta,
-                 y_zero_reference_cell,
-                 wind,
-                 atmospheric_pressure,
-                 write_netcdf,
-                 ignore_ghostcells,
-                 offset_x, offset_y,
-                 comm,
-                 block_width, block_height,
+                 gpu_ctx: KernelContext,
+                 nx: int, ny: int,
+                 ghost_cells_x: int,
+                 ghost_cells_y: int,
+                 dx: float, dy: float, dt: float,
+                 g: float, f: float, r: float, A: float | None,
+                 t: float,
+                 theta: float | None, rk_order: float | None,
+                 coriolis_beta: float,
+                 y_zero_reference_cell: float,
+                 wind: WindStress.WindStress,
+                 atmospheric_pressure: AtmosphericPressure.AtmosphericPressure,
+                 write_netcdf: bool,
+                 ignore_ghostcells: bool,
+                 offset_x: int, offset_y: int,
+                 comm: MPI.Intracomm,
+                 block_width: int, block_height: int,
                  local_particle_id=0):
         """
         Setting all parameters that are common for all simulators
@@ -78,22 +86,22 @@ class Simulator(object):
         # Notice that we need to specify them in the correct dataformat for the
         # CUDA kernel
         self.gpu_ctx = gpu_ctx
-        self.nx = np.int32(nx)
-        self.ny = np.int32(ny)
-        self.ghost_cells_x = np.int32(ghost_cells_x)
-        self.ghost_cells_y = np.int32(ghost_cells_y)
-        self.dx = np.float32(dx)
-        self.dy = np.float32(dy)
+        self.nx = int(nx)
+        self.ny = int(ny)
+        self.ghost_cells_x = int(ghost_cells_x)
+        self.ghost_cells_y = int(ghost_cells_y)
+        self.dx = float(dx)
+        self.dy = float(dy)
         self.dt = dt
-        self.g = np.float32(g)
-        self.f = np.float32(f)
-        self.r = np.float32(r)
-        self.coriolis_beta = np.float32(coriolis_beta)
+        self.g = float(g)
+        self.f = float(f)
+        self.r = float(r)
+        self.coriolis_beta = float(coriolis_beta)
         self.wind_stress = wind
         if self.wind_stress.stress_u is None or self.wind_stress.stress_v is None:
             self.wind_stress.compute_wind_stress_from_wind()
         self.atmospheric_pressure = atmospheric_pressure
-        self.y_zero_reference_cell = np.float32(y_zero_reference_cell)
+        self.y_zero_reference_cell = float(y_zero_reference_cell)
 
         self.offset_x = offset_x
         self.offset_y = offset_y
@@ -105,52 +113,52 @@ class Simulator(object):
         self.wind_stress_timestamps = {}
 
         t_max_index = len(self.wind_stress.t) - 1
-        t0_index = max(0, np.searchsorted(self.wind_stress.t, self.t) - 1)
-        t1_index = min(t_max_index, np.searchsorted(self.wind_stress.t, self.t))
-        self.wind_stress_x_current_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                            self.wind_stress.stress_u[t0_index].shape[1],
-                                                            self.wind_stress.stress_u[t0_index].shape[0], 0, 0,
-                                                            self.wind_stress.stress_u[t0_index])
-        self.wind_stress_y_current_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                            self.wind_stress.stress_v[t0_index].shape[1],
-                                                            self.wind_stress.stress_v[t0_index].shape[0], 0, 0,
-                                                            self.wind_stress.stress_v[t0_index])
-        self.wind_stress_x_next_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                         self.wind_stress.stress_u[t1_index].shape[1],
-                                                         self.wind_stress.stress_u[t1_index].shape[0], 0, 0,
-                                                         self.wind_stress.stress_u[t1_index])
-        self.wind_stress_y_next_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                         self.wind_stress.stress_v[t1_index].shape[1],
-                                                         self.wind_stress.stress_v[t1_index].shape[0], 0, 0,
-                                                         self.wind_stress.stress_v[t1_index])
+        t0_index = max(0, int(np.searchsorted(self.wind_stress.t, self.t)) - 1)
+        t1_index = min(t_max_index, int(np.searchsorted(self.wind_stress.t, self.t)))
+        self.wind_stress_x_current_arr = Array2D(self.gpu_stream,
+                                                 self.wind_stress.stress_u[t0_index].shape[1],
+                                                 self.wind_stress.stress_u[t0_index].shape[0], 0, 0,
+                                                 self.wind_stress.stress_u[t0_index])
+        self.wind_stress_y_current_arr = Array2D(self.gpu_stream,
+                                                 self.wind_stress.stress_v[t0_index].shape[1],
+                                                 self.wind_stress.stress_v[t0_index].shape[0], 0, 0,
+                                                 self.wind_stress.stress_v[t0_index])
+        self.wind_stress_x_next_arr = Array2D(self.gpu_stream,
+                                              self.wind_stress.stress_u[t1_index].shape[1],
+                                              self.wind_stress.stress_u[t1_index].shape[0], 0, 0,
+                                              self.wind_stress.stress_u[t1_index])
+        self.wind_stress_y_next_arr = Array2D(self.gpu_stream,
+                                              self.wind_stress.stress_v[t1_index].shape[1],
+                                              self.wind_stress.stress_v[t1_index].shape[0], 0, 0,
+                                              self.wind_stress.stress_v[t1_index])
 
         # Initialize atmospheric pressure parameters
         self.atmospheric_pressure_timestamps = {}
 
         t_max_index = len(self.atmospheric_pressure.t) - 1
-        t0_index = max(0, np.searchsorted(self.atmospheric_pressure.t, self.t) - 1)
-        t1_index = min(t_max_index, np.searchsorted(self.atmospheric_pressure.t, self.t))
-        self.atmospheric_pressure_current_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                                   self.atmospheric_pressure.P[t0_index].shape[1],
-                                                                   self.atmospheric_pressure.P[0].shape[0], 0, 0,
-                                                                   self.atmospheric_pressure.P[t0_index])
-        self.atmospheric_pressure_next_arr = Common.CUDAArray2D(self.gpu_stream,
-                                                                self.atmospheric_pressure.P[t1_index].shape[1],
-                                                                self.atmospheric_pressure.P[0].shape[0], 0, 0,
-                                                                self.atmospheric_pressure.P[t1_index])
+        t0_index = max(0, int(np.searchsorted(self.atmospheric_pressure.t, self.t)) - 1)
+        t1_index = min(t_max_index, int(np.searchsorted(self.atmospheric_pressure.t, self.t)))
+        self.atmospheric_pressure_current_arr = Array2D(self.gpu_stream,
+                                                        self.atmospheric_pressure.P[t0_index].shape[1],
+                                                        self.atmospheric_pressure.P[0].shape[0], 0, 0,
+                                                        self.atmospheric_pressure.P[t0_index])
+        self.atmospheric_pressure_next_arr = Array2D(self.gpu_stream,
+                                                     self.atmospheric_pressure.P[t1_index].shape[1],
+                                                     self.atmospheric_pressure.P[0].shape[0], 0, 0,
+                                                     self.atmospheric_pressure.P[t1_index])
         if A is None:
             self.A = 'NA'  # Eddy viscocity coefficient
         else:
-            self.A = np.float32(A)
+            self.A = float(A)
 
         if theta is None:
             self.theta = 'NA'
         else:
-            self.theta = np.float32(theta)
+            self.theta = float(theta)
         if rk_order is None:
             self.rk_order = 'NA'
         else:
-            self.rk_order = np.int32(rk_order)
+            self.rk_order = int(rk_order)
 
         self.hasDrifters = False
         self.drifters = None
@@ -177,13 +185,13 @@ class Simulator(object):
         # Compute kernel launch parameters
         self.local_size = (block_width, block_height, 1)
         self.global_size = (
-                int(np.ceil(self.nx / float(self.local_size[0]))),
-                int(np.ceil(self.ny / float(self.local_size[1])))
-            )
+            int(np.ceil(self.nx / float(self.local_size[0]))),
+            int(np.ceil(self.ny / float(self.local_size[1])))
+        )
 
     """
     Function which updates the wind stress textures
-    @param kernel_module Module (from get_kernel in CUDAContext)
+    @param kernel_module Module (from get_kernel in KernelContext)
     """
 
     def update_wind_stress(self, kernel_module):
@@ -193,8 +201,8 @@ class Simulator(object):
 
         # Compute new t0 and t1
         t_max_index = len(self.wind_stress.t) - 1
-        t0_index = max(0, np.searchsorted(self.wind_stress.t, self.t) - 1)
-        t1_index = min(t_max_index, np.searchsorted(self.wind_stress.t, self.t))
+        t0_index = max(0, int(np.searchsorted(self.wind_stress.t, self.t)) - 1)
+        t1_index = min(t_max_index, int(np.searchsorted(self.wind_stress.t, self.t)))
         new_t0 = self.wind_stress.t[t0_index]
         new_t1 = self.wind_stress.t[t1_index]
 
@@ -209,7 +217,7 @@ class Simulator(object):
         # Log some debug info
         self.logger.debug("Times: %s", str(self.wind_stress.t))
         self.logger.debug("Time indices: [%d, %d]", t0_index, t1_index)
-        self.logger.debug("Time: %s  New interval is [%s, %s], old was [%s, %s]", \
+        self.logger.debug("Time: %s  New interval is [%s, %s], old was [%s, %s]",
                           self.t, new_t0, new_t1, old_t0, old_t1)
 
         # If time interval has changed, upload new data
@@ -240,7 +248,7 @@ class Simulator(object):
 
     """
     Function which updates the atmospheric pressure data arrays
-    @param kernel_module Module (from get_kernel in CUDAContext)
+    @param kernel_module Module (from get_kernel in KernelContext)
     """
 
     def update_atmospheric_pressure(self, kernel_module):
@@ -250,15 +258,15 @@ class Simulator(object):
 
         # Compute new t0 and t1
         t_max_index = len(self.atmospheric_pressure.t) - 1
-        t0_index = max(0, np.searchsorted(self.atmospheric_pressure.t, self.t) - 1)
-        t1_index = min(t_max_index, np.searchsorted(self.atmospheric_pressure.t, self.t))
+        t0_index = max(0, int(np.searchsorted(self.atmospheric_pressure.t, self.t)) - 1)
+        t1_index = min(t_max_index, int(np.searchsorted(self.atmospheric_pressure.t, self.t)))
         new_t0 = self.atmospheric_pressure.t[t0_index]
         new_t1 = self.atmospheric_pressure.t[t1_index]
 
         # Find the old (and update)
         old_t0 = None
         old_t1 = None
-        if (key in self.atmospheric_pressure_timestamps):
+        if key in self.atmospheric_pressure_timestamps:
             old_t0 = self.atmospheric_pressure_timestamps[key][0]
             old_t1 = self.atmospheric_pressure_timestamps[key][1]
         self.atmospheric_pressure_timestamps[key] = [new_t0, new_t1]
@@ -266,11 +274,11 @@ class Simulator(object):
         # Log some debug info
         self.logger.debug("Times: %s", str(self.atmospheric_pressure.t))
         self.logger.debug("Time indices: [%d, %d]", t0_index, t1_index)
-        self.logger.debug("Time: %s  New interval is [%s, %s], old was [%s, %s]", \
+        self.logger.debug("Time: %s  New interval is [%s, %s], old was [%s, %s]",
                           self.t, new_t0, new_t1, old_t0, old_t1)
 
         # If time interval has changed, upload new data
-        if (new_t0 != old_t0):
+        if new_t0 != old_t0:
             self.gpu_stream.synchronize()
             self.gpu_ctx.synchronize()
             self.logger.debug("Updating current atmospheric pressure")
@@ -301,7 +309,7 @@ class Simulator(object):
         pass
 
     @abstractmethod
-    def fromfilename(cls, filename, cont_write_netcdf=True):
+    def fromfilename(cls, filename: str, cont_write_netcdf=True):
         """
         Initialize and hotstart simulation from nc-file.
         cont_write_netcdf: Continue to write the results after each superstep to a new netCDF file
@@ -349,7 +357,7 @@ class Simulator(object):
         self.CPsims = sim_list
         self.CPdrifter_t = self.t
 
-    def download(self, interior_domain_only=False):
+    def download(self, interior_domain_only=False) -> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
         """
         Download the latest time step from the GPU
         """
@@ -404,7 +412,7 @@ class Simulator(object):
             self.drifters.setDrifterPositions(otherSim.drifters.getDrifterPositions())
             self.drifters.setObservationPosition(otherSim.drifters.getObservationPosition())
 
-    def upload(self, eta0, hu0, hv0, eta1=None, hu1=None, hv1=None):
+    def upload(self, eta0: npt.NDArray, hu0: npt.NDArray, hv0: npt.NDArray, eta1: npt.NDArray=None, hu1: npt.NDArray=None, hv1: npt.NDArray=None):
         """
         Reinitialize simulator with a new ocean state.
         """
@@ -423,7 +431,7 @@ class Simulator(object):
 
         # Update boundary conditions
         self.bc_kernel.update_bc_values(self.gpu_stream, self.t)
-        self.bc_kernel.boundaryCondition(self.gpu_stream, \
+        self.bc_kernel.boundaryCondition(self.gpu_stream,
                                          self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0)
 
     def _set_interior_domain_from_sponge_cells(self):
@@ -431,6 +439,6 @@ class Simulator(object):
         Use possible existing sponge cells to correctly set the 
         variable self.interior_domain_incides
         """
-        if (self.boundary_conditions.isSponge()):
+        if self.boundary_conditions.isSponge():
             assert (
                 False), 'This function is deprecated - sponge cells should now be considered part of the interior domain'
