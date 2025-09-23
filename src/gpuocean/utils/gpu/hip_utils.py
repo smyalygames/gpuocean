@@ -1,4 +1,4 @@
-from hip import hip, hiprtc, hipblas
+from hip import hip, hiprtc, hipblas, hiprand
 
 
 def hip_check(call_request):
@@ -15,5 +15,7 @@ def hip_check(call_request):
     elif isinstance(err, hiprtc.hiprtcResult) and err != hiprtc.hiprtcResult.HIPRTC_SUCCESS:
         raise RuntimeError(str(err))
     elif isinstance(err, hipblas.hipblasStatus_t) and err != hipblas.hipblasStatus_t.HIPBLAS_STATUS_SUCCESS:
+        raise RuntimeError(str(err))
+    elif isinstance(err, hiprand.hiprandStatus_t) and err != hiprand.hiprandStatus_t.HIPRAND_STATUS_SUCCESS:
         raise RuntimeError(str(err))
     return result

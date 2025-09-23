@@ -10,6 +10,7 @@ if __env_name in environ and environ.get(__env_name).lower() == "cuda":
     from .kernels.cuda.cuda_handler import CudaHandler as GPUHandler
     from .kernels.cuda.cuda_event import CudaEvent as Event
     from .kernels.cuda.cuda_stream import CudaStream as GPUStream
+    from .utils.cuda.cuda_random_numbers import CudaRandomNumbers as XORWOWHandler
 
     if TYPE_CHECKING:
         from pycuda import driver
@@ -22,6 +23,7 @@ else:
     from .kernels.hip.hip_handler import HIPHandler as GPUHandler
     from .kernels.hip.hip_event import HIPEvent as Event
     from .kernels.hip.hip_stream import HIPStream as GPUStream
+    from .utils.hip.hip_random_numbers import HIPRandomNumbers as XORWOWHandler
 
     if TYPE_CHECKING:
         from hip import hip
