@@ -27,10 +27,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import gc
 
-from matplotlib import pyplot as plt
 import numpy as np
 
-from gpuocean.utils import RandomNumbers, config
+from gpuocean.utils.random_numbers import RandomNumbers
 from gpuocean.utils.gpu import GPUHandler, Array2D
 
 if TYPE_CHECKING:
@@ -116,26 +115,26 @@ class ModelErrorKL(object):
         self.roll_x_cos = 0.0
         self.roll_y_cos = 0.0
 
-        self.N_basis_x = np.int32(self.basis_x_end - self.basis_x_start + 1)
-        self.N_basis_y = np.int32(self.basis_y_end - self.basis_y_start + 1)
+        self.N_basis_x = self.basis_x_end - self.basis_x_start + 1
+        self.N_basis_y = self.basis_y_end - self.basis_y_start + 1
 
         # self.periodicNorthSouth = np.int32(boundaryConditions.isPeriodicNorthSouth())
         # self.periodicEastWest = np.int32(boundaryConditions.isPeriodicEastWest())
 
         # Size of random array
         # We sample one random number per KL basis field (both sine and cosine) 
-        self.rand_nx = np.int32(self.N_basis_x)
-        self.rand_ny = np.int32(self.N_basis_y * 2)
+        self.rand_nx = self.N_basis_x
+        self.rand_ny = self.N_basis_y * 2
 
-        self.rng = RandomNumbers.RandomNumbers(gpu_ctx, self.gpu_stream,
+        self.rng = RandomNumbers(gpu_ctx, self.gpu_stream,
                                                self.rand_nx, self.rand_ny,
                                                use_lcg=self.use_lcg, xorwow_seed=xorwow_seed,
                                                block_width=block_width, block_height=block_height)
 
         # Since normal distributed numbers are generated in pairs, we need to store half the number of
         # of seed values compared to the number of random numbers.
-        self.seed_ny = np.int32(self.rand_ny)
-        self.seed_nx = np.int32(np.ceil(self.rand_nx / 2))
+        self.seed_ny = self.rand_ny
+        self.seed_nx = int(np.ceil(self.rand_nx / 2))
 
         # Generate seed:
         self.floatMax = self.rng.floatMax
@@ -388,7 +387,7 @@ class ModelErrorKL(object):
                           y0_reference_cell=0,
                           update_random_field=True,
                           perturbation_scale=1.0,
-                          land_mask_value=np.float32(1.0e20),
+                          land_mask_value: float = 1.0e20,
                           random_numbers=None,
                           roll_x_sin=None, roll_y_sin=None,
                           roll_x_cos=None, roll_y_cos=None,
@@ -604,12 +603,12 @@ class ModelErrorKL(object):
     # CPU utility functions:
     # ------------------------------
 
-    def _lcg(self, seed):
-        modulo = np.uint64(2147483647)
+    def _lcg(self, seed: int):
+        modulo = np.uint64(np.iinfo(np.float32).max)
         seed = np.uint64(((seed * 1103515245) + 12345) % modulo)  # 0x7fffffff
-        return seed / 2147483648.0, seed
+        return int(seed) / float(np.iinfo(np.float32).max), seed
 
-    def _boxMuller(self, seed_in):
+    def _boxMuller(self, seed_in: int):
         seed = np.uint64(seed_in)
         u1, seed = self._lcg(seed)
         u2, seed = self._lcg(seed)
