@@ -123,7 +123,7 @@ class KP07(Simulator.Simulator):
             y_zero_reference_cell = int(boundary_conditions.spongeCells.south) + y_zero_reference_cell
 
         self.use_rk2 = use_rk2
-        rk_order = np.int32(use_rk2 + 1)
+        rk_order = int(use_rk2 + 1)
         A = None
         super(KP07, self).__init__(gpu_ctx,
                                    nx, ny,
@@ -166,10 +166,10 @@ class KP07(Simulator.Simulator):
                    'KPSIMULATOR_FLUX_SLOPE_EPS_4': str(flux_slope_eps ** 4) + 'f',
                    'KPSIMULATOR_DEPTH_CUTOFF': str(depth_cutoff) + 'f',
                    'FLUX_BALANCER': "{:.12f}f".format(flux_balancer),
-                   'WIND_STRESS_X_NX': int(self.wind_stress.wind_u[0].shape[1]),
-                   'WIND_STRESS_X_NY': int(self.wind_stress.wind_u[0].shape[0]),
-                   'WIND_STRESS_Y_NX': int(self.wind_stress.wind_v[0].shape[1]),
-                   'WIND_STRESS_Y_NY': int(self.wind_stress.wind_v[0].shape[0]),
+                   'WIND_STRESS_X_NX': self.wind_stress.wind_u[0].shape[1],
+                   'WIND_STRESS_X_NY': self.wind_stress.wind_u[0].shape[0],
+                   'WIND_STRESS_Y_NX': self.wind_stress.wind_v[0].shape[1],
+                   'WIND_STRESS_Y_NY': self.wind_stress.wind_v[0].shape[0],
                    }
 
         # Get kernels

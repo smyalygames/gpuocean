@@ -181,7 +181,7 @@ class CTCS(Simulator.Simulator):
 
         # "Beautify" code a bit by packing four bools into a single int
         # Note: Must match code in kernel!
-        self.wall_bc = np.int32(0)
+        self.wall_bc = 0
         if self.boundary_conditions.north == 1:
             self.wall_bc = self.wall_bc | 0x01
         if self.boundary_conditions.east == 1:
@@ -359,17 +359,17 @@ class CTCS_boundary_condition:
 
         self.boundary_conditions = boundary_conditions
 
-        self.bc_north = np.int32(boundary_conditions.north.value)
-        self.bc_east = np.int32(boundary_conditions.east.value)
-        self.bc_south = np.int32(boundary_conditions.south.value)
-        self.bc_west = np.int32(boundary_conditions.west.value)
+        self.bc_north = boundary_conditions.north.value
+        self.bc_east = boundary_conditions.east.value
+        self.bc_south = boundary_conditions.south.value
+        self.bc_west = boundary_conditions.west.value
 
-        self.nx = np.int32(nx)
-        self.ny = np.int32(ny)
-        self.halo_x = np.int32(halo_x)
-        self.halo_y = np.int32(halo_y)
-        self.nx_halo = np.int32(nx + 2 * halo_x)
-        self.ny_halo = np.int32(ny + 2 * halo_y)
+        self.nx = nx
+        self.ny = ny
+        self.halo_x = halo_x
+        self.halo_y = halo_y
+        self.nx_halo = nx + 2 * halo_x
+        self.ny_halo = ny + 2 * halo_y
 
         # Set kernel launch parameters
         self.local_size = (block_width, block_height, 1)
@@ -484,8 +484,6 @@ class CTCS_boundary_condition:
         """
         Call othe approporary sponge-like boundary condition with the given data
         """
-        staggered_x_int32 = np.int32(staggered_x)
-        staggered_y_int32 = np.int32(staggered_y)
 
         # print "callSpongeNS"
         if (self.bc_north == 3) or (self.bc_south == 3):
@@ -493,7 +491,7 @@ class CTCS_boundary_condition:
                 self.global_size, self.local_size, gpu_stream,
                 [self.nx, self.ny,
                  self.halo_x, self.halo_y,
-                 staggered_x_int32, staggered_y_int32,
+                 staggered_x, staggered_y,
                  self.boundary_conditions.spongeCells.north,
                  self.boundary_conditions.spongeCells.south,
                  self.bc_north, self.bc_south,
@@ -503,15 +501,13 @@ class CTCS_boundary_condition:
                 self.global_size, self.local_size, gpu_stream,
                 [self.nx, self.ny,
                  self.halo_x, self.halo_y,
-                 staggered_x_int32, staggered_y_int32,
+                 staggered_x, staggered_y,
                  self.boundary_conditions.spongeCells.north,
                  self.boundary_conditions.spongeCells.south,
                  self.bc_north, self.bc_south,
                  data.pointer, data.pitch])
 
     def callSpongeEW(self, gpu_stream: GPUStream, data: Array2D, staggered_x: int, staggered_y: int):
-        staggered_x_int32 = np.int32(staggered_x)
-        staggered_y_int32 = np.int32(staggered_y)
 
         # print "CallSpongeEW"
         if (self.bc_east == 3) or (self.bc_west == 3):
@@ -519,7 +515,7 @@ class CTCS_boundary_condition:
                 self.global_size, self.local_size, gpu_stream,
                 [self.nx, self.ny,
                  self.halo_x, self.halo_y,
-                 staggered_x_int32, staggered_y_int32,
+                 staggered_x, staggered_y,
                  self.boundary_conditions.spongeCells.east,
                  self.boundary_conditions.spongeCells.west,
                  self.bc_east, self.bc_west,
@@ -530,7 +526,7 @@ class CTCS_boundary_condition:
                 self.global_size, self.local_size, gpu_stream,
                 [self.nx, self.ny,
                  self.halo_x, self.halo_y,
-                 staggered_x_int32, staggered_y_int32,
+                 staggered_x, staggered_y,
                  self.boundary_conditions.spongeCells.east,
                  self.boundary_conditions.spongeCells.west,
                  self.bc_east, self.bc_west,
