@@ -30,7 +30,8 @@ import gc
 import numpy as np
 import numpy.typing as npt
 
-from gpuocean.utils import RandomNumbers, config
+from gpuocean.utils import config
+from gpuocean.utils.random_numbers import RandomNumbers
 from gpuocean.SWEsimulators import FBL, CTCS
 from gpuocean.utils.gpu import GPUHandler, Array2D
 
@@ -53,8 +54,8 @@ class OceanStateNoise(object):
                  soar_q0: float = None, soar_L: float = None,
                  interpolation_factor=1,
                  use_lcg=False, xorwow_seed=None, np_seed=None,
-                 angle=np.array([[0]], dtype=np.float32),
-                 coriolis_f=np.array([[0]], dtype=np.float32),
+                 angle: Array2D | npt.NDArray = np.array([[0]], dtype=np.float32),
+                 coriolis_f: Array2D | npt.NDArray = np.array([[0]], dtype=np.float32),
                  block_width=16, block_height=16):
         """
         Initiates a class that generates small scale geostrophically balanced perturbations of
@@ -99,7 +100,7 @@ class OceanStateNoise(object):
         # The size of the cutoff determines the computational radius in the
         # SOAR function. Hence, the size of the local memory in the OpenCL 
         # kernels has to be hard-coded.
-        self.cutoff = np.int32(config.soar_cutoff)
+        self.cutoff = config.soar_cutoff
 
         # Check that the interpolation factor plays well with the grid size:
         assert (
@@ -130,14 +131,14 @@ class OceanStateNoise(object):
             self.rand_ghost_cells_x = 0
         if self.periodicNorthSouth:
             self.rand_ghost_cells_y = 0
-        self.rand_nx = int(self.coarse_nx + 2*self.rand_ghost_cells_x)
-        self.rand_ny = int(self.coarse_ny + 2*self.rand_ghost_cells_y)
+        self.rand_nx = int(self.coarse_nx + 2 * self.rand_ghost_cells_x)
+        self.rand_ny = int(self.coarse_ny + 2 * self.rand_ghost_cells_y)
 
-        self.rng = RandomNumbers.RandomNumbers(gpu_ctx, self.gpu_stream,
-                                               self.rand_nx, self.rand_ny,
-                                               use_lcg=self.use_lcg,
-                                               seed=np_seed, xorwow_seed=xorwow_seed,
-                                               block_width=block_width, block_height=block_height)
+        self.rng = RandomNumbers(gpu_ctx, self.gpu_stream,
+                                 self.rand_nx, self.rand_ny,
+                                 use_lcg=self.use_lcg,
+                                 seed=np_seed, xorwow_seed=xorwow_seed,
+                                 block_width=block_width, block_height=block_height)
 
         # Since normal distributed numbers are generated in pairs, we need to store half the number of
         # of seed values compared to the number of random numbers.
@@ -355,7 +356,7 @@ class OceanStateNoise(object):
                           q0_scale=1.0, update_random_field=True,
                           perturbation_scale=1.0, perpendicular_scale=0.0,
                           align_with_cell_i=None, align_with_cell_j=None,
-                          land_mask_value=np.float32(1.0e20),
+                          land_mask_value=1.0e20,
                           stream: GPUStream = None):
         """
         Apply the SOAR Q covariance matrix on the random ocean field which is
@@ -381,7 +382,7 @@ class OceanStateNoise(object):
             # Need to update the random field, requiering a global sync
             self.generateNormalDistribution()
 
-        soar_q0 = np.float32(self.soar_q0 * q0_scale)
+        soar_q0 = float(self.soar_q0 * q0_scale)
 
         offset_i, offset_j = self._obtain_coarse_grid_offset(align_with_cell_i, align_with_cell_j)
 
@@ -389,72 +390,72 @@ class OceanStateNoise(object):
 
         self.soarKernel.async_call(self.global_size_SOAR, self.local_size, stream,
                                    [self.coarse_nx, self.coarse_ny,
-                              self.coarse_dx, self.coarse_dy,
+                                    self.coarse_dx, self.coarse_dy,
 
-                              soar_q0, self.soar_L,
-                              perturbation_scale,
+                                    soar_q0, self.soar_L,
+                                    perturbation_scale,
 
-                              self.periodicNorthSouth, self.periodicEastWest,
-                              self.random_numbers.pointer, self.random_numbers.pitch,
-                              self.coarse_buffer.pointer, self.coarse_buffer.pitch,
-                              0])
+                                    self.periodicNorthSouth, self.periodicEastWest,
+                                    self.random_numbers.pointer, self.random_numbers.pitch,
+                                    self.coarse_buffer.pointer, self.coarse_buffer.pitch,
+                                    0])
         if perpendicular_scale > 0:
             self.soarKernel.async_call(self.global_size_SOAR, self.local_size, stream,
                                        [self.coarse_nx, self.coarse_ny,
-                                  self.coarse_dx, self.coarse_dy,
+                                        self.coarse_dx, self.coarse_dy,
 
-                                  soar_q0, self.soar_L,
-                                  perpendicular_scale,
+                                        soar_q0, self.soar_L,
+                                        perpendicular_scale,
 
-                                  self.periodicNorthSouth, self.periodicEastWest,
-                                  self.perpendicular_random_numbers.pointer,
-                                  self.perpendicular_random_numbers.pitch,
-                                  self.coarse_buffer.pointer, self.coarse_buffer.pitch,
-                                  1])
+                                        self.periodicNorthSouth, self.periodicEastWest,
+                                        self.perpendicular_random_numbers.pointer,
+                                        self.perpendicular_random_numbers.pitch,
+                                        self.coarse_buffer.pointer, self.coarse_buffer.pitch,
+                                        1])
 
         if self.interpolation_factor > 1:
             self.bicubicInterpolationKernel.async_call(self.global_size_geo_balance, self.local_size, stream,
                                                        [self.nx, self.ny,
-                                                  ghost_cells_x, ghost_cells_y,
-                                                  self.dx, self.dy,
+                                                        ghost_cells_x, ghost_cells_y,
+                                                        self.dx, self.dy,
 
-                                                  self.coarse_nx, self.coarse_ny,
-                                                  ghost_cells_x, ghost_cells_y,
-                                                  self.coarse_dx, self.coarse_dy,
-                                                  offset_i, offset_j,
+                                                        self.coarse_nx, self.coarse_ny,
+                                                        ghost_cells_x, ghost_cells_y,
+                                                        self.coarse_dx, self.coarse_dy,
+                                                        offset_i, offset_j,
 
-                                                  g, f,
-                                                  beta, y0_reference_cell,
+                                                        g, f,
+                                                        beta, y0_reference_cell,
 
-                                                  self.coriolis_f_arr.pointer,
-                                                  self.angle_arr.pointer,
+                                                        self.coriolis_f_arr.pointer,
+                                                        self.angle_arr.pointer,
 
-                                                  self.coarse_buffer.pointer,
-                                                  self.coarse_buffer.pitch,
-                                                  eta.pointer, eta.pitch,
-                                                  hu.pointer, hu.pitch,
-                                                  hv.pointer, hv.pitch,
-                                                  H.pointer, H.pitch,
-                                                  land_mask_value])
+                                                        self.coarse_buffer.pointer,
+                                                        self.coarse_buffer.pitch,
+                                                        eta.pointer, eta.pitch,
+                                                        hu.pointer, hu.pitch,
+                                                        hv.pointer, hv.pitch,
+                                                        H.pointer, H.pitch,
+                                                        land_mask_value])
 
         else:
             self.geostrophicBalanceKernel.async_call(self.global_size_geo_balance, self.local_size, stream,
                                                      [self.nx, self.ny,
-                                                self.dx, self.dy,
-                                                ghost_cells_x, ghost_cells_y,
+                                                      self.dx, self.dy,
+                                                      ghost_cells_x, ghost_cells_y,
 
-                                                g, f,
-                                                beta, y0_reference_cell,
+                                                      g, f,
+                                                      beta, y0_reference_cell,
 
-                                                self.coriolis_f_arr.pointer,
-                                                self.angle_arr.pointer,
+                                                      self.coriolis_f_arr.pointer,
+                                                      self.angle_arr.pointer,
 
-                                                self.coarse_buffer.pointer, self.coarse_buffer.pitch,
-                                                eta.pointer, eta.pitch,
-                                                hu.pointer, hu.pitch,
-                                                hv.pointer, hv.pitch,
-                                                H.pointer, H.pitch,
-                                                land_mask_value])
+                                                      self.coarse_buffer.pointer, self.coarse_buffer.pitch,
+                                                      eta.pointer, eta.pitch,
+                                                      hu.pointer, hu.pitch,
+                                                      hv.pointer, hv.pitch,
+                                                      H.pointer, H.pitch,
+                                                      land_mask_value])
 
     def _obtain_coarse_grid_offset(self, fine_index_i, fine_index_j):
 
@@ -481,8 +482,8 @@ class OceanStateNoise(object):
                                         self.local_size_reductions,
                                         self.gpu_stream,
                                         [self.rand_nx, self.rand_ny,
-                                                 self.random_numbers.pointer,
-                                                 self.reduction_buffer.pointer])
+                                         self.random_numbers.pointer,
+                                         self.reduction_buffer.pointer])
         return self.getReductionBuffer()[0, 0]
 
     def findDoubleNormAndDot(self):
@@ -494,9 +495,9 @@ class OceanStateNoise(object):
                                               self.local_size_reductions,
                                               self.gpu_stream,
                                               [self.rand_nx, self.rand_ny,
-                                                       self.random_numbers.pointer,
-                                                       self.perpendicular_random_numbers.pointer,
-                                                       self.reduction_buffer.pointer])
+                                               self.random_numbers.pointer,
+                                               self.perpendicular_random_numbers.pointer,
+                                               self.reduction_buffer.pointer])
 
     def _makePerpendicular(self):
         """
@@ -509,10 +510,10 @@ class OceanStateNoise(object):
         self.makePerpendicularKernel.async_call(self.global_size_perpendicular, self.local_size,
                                                 self.gpu_stream,
                                                 [self.rand_nx, self.rand_ny,
-                                                         self.random_numbers.pointer, self.random_numbers.pitch,
-                                                         self.perpendicular_random_numbers.pointer,
-                                                         self.perpendicular_random_numbers.pitch,
-                                                         self.reduction_buffer.pointer])
+                                                 self.random_numbers.pointer, self.random_numbers.pitch,
+                                                 self.perpendicular_random_numbers.pointer,
+                                                 self.perpendicular_random_numbers.pitch,
+                                                 self.reduction_buffer.pointer])
 
     def generatePerpendicularNormalDistributions(self):
         """
@@ -559,10 +560,7 @@ class OceanStateNoise(object):
         if self.interpolation_factor > 1:
             d_eta = self._interpolate_CPU(d_eta, geostrophic_balance=False)
 
-        interior = [-ghost_cells_y, -ghost_cells_x, ghost_cells_y, ghost_cells_x]
-        for i in range(4):
-            if interior[i] == 0:
-                interior[i] = None
+        interior = [x if x != 0 else None for x in [-ghost_cells_y, -ghost_cells_x, ghost_cells_y, ghost_cells_x]]
 
         eta[interior[2]:interior[0], interior[3]:interior[1]] = d_eta[2:-2, 2:-2]
 
@@ -586,10 +584,7 @@ class OceanStateNoise(object):
         # generates perturbation (d_eta[ny+4, nx+4], d_hu[ny, nx] and d_hv[ny, nx])
         d_eta, d_hu, d_hv = self._obtainOceanPerturbations_CPU(H, f, beta, g)
 
-        interior = [-ghost_cells_y, -ghost_cells_x, ghost_cells_y, ghost_cells_x]
-        for i in range(4):
-            if interior[i] == 0:
-                interior[i] = None
+        interior = [x if x != 0 else None for x in [-ghost_cells_y, -ghost_cells_x, ghost_cells_y, ghost_cells_x]]
 
         eta[interior[2]:interior[0], interior[3]:interior[1]] += d_eta[2:-2, 2:-2]
         hu[interior[2]:interior[0], interior[3]:interior[1]] += d_hu
@@ -600,9 +595,9 @@ class OceanStateNoise(object):
     # ------------------------------
 
     def _lcg(self, seed):
-        modulo = np.uint64(2147483647)
+        modulo = np.uint64(np.finfo(np.float32).max)
         seed = np.uint64(((seed * 1103515245) + 12345) % modulo)  # 0x7fffffff
-        return seed / 2147483648.0, seed
+        return seed / float(np.finfo(np.float32).max), seed
 
     def _boxMuller(self, seed_in):
         seed = np.uint64(seed_in)
@@ -678,8 +673,8 @@ class OceanStateNoise(object):
 
         # Assume in a GPU setting - we read xi into shared memory with ghostcells
         # Additional cutoff number of ghost cells required to calculate SOAR contribution
-        ny_halo = int(self.coarse_ny + (2 + self.cutoff) * 2)
-        nx_halo = int(self.coarse_nx + (2 + self.cutoff) * 2)
+        ny_halo = self.coarse_ny + (2 + self.cutoff) * 2
+        nx_halo = self.coarse_nx + (2 + self.cutoff) * 2
         local_xi = np.zeros((ny_halo, nx_halo))
         for j in range(ny_halo):
             global_j = j
@@ -883,3 +878,4 @@ class OceanStateNoise(object):
         elif interpolation_order == 3:
             # Bicubic interpolation (make sure that we return a float)
             return np.dot(x_vec, np.dot(a_matrix, y_vec))[0, 0]
+        return None
