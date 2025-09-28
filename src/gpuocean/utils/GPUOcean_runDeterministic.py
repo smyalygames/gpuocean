@@ -1,13 +1,14 @@
 #Import packages we need
-import numpy as np
-from netCDF4 import Dataset
 import datetime
-from IPython.display import display
-import matplotlib
-from matplotlib import pyplot as plt
 import importlib
 from datetime import timedelta
 import pyproj
+
+import numpy as np
+from netCDF4 import Dataset
+from IPython.display import display
+import matplotlib
+from matplotlib import pyplot as plt
 
 #For GPUOcean
 from gpuocean.SWEsimulators import CDKLM16
@@ -302,12 +303,12 @@ def simulate_gpuocean_deterministic(source_url, domain, initx, inity,
     
     num_drifters = len(initx)
     
-    drifters = GPUDrifterCollection.GPUDrifterCollection(sim_args['gpu_ctx'], num_drifters, wind = wind_data, 
+    drifters = GPUDrifterCollection.GPUDrifterCollection(sim_args['gpu_ctx'], num_drifters, wind = wind_data,
                                                          wind_drift_factor = wind_drift_factor,
-                                                     boundaryConditions = sim.boundary_conditions,
-                                                     domain_size_x = trajectory_forecast.domain_size_x,
-                                                     domain_size_y = trajectory_forecast.domain_size_y,
-                                                     gpu_stream = sim.gpu_stream)
+                                                         boundary_conditions= sim.boundary_conditions,
+                                                         domain_size_x = trajectory_forecast.domain_size_x,
+                                                         domain_size_y = trajectory_forecast.domain_size_y,
+                                                         gpu_stream = sim.gpu_stream)
     
     drifter_pos_init = np.array([initx, inity]).T
         

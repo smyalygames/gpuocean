@@ -23,15 +23,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+import time
+import gc
+import abc
+import warnings
+import os, sys, datetime
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import time
-import gc
-import abc
-import warnings 
-import os, sys, datetime
 
 import pycuda.driver as cuda
 
@@ -39,6 +41,10 @@ from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.utils import Common, ParticleInfo, Observation, SimReader
 from gpuocean.ensembles import BaseOceanStateEnsemble
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
+from gpuocean.utils.gpu import GPUStream
+
+if TYPE_CHECKING:
+    from gpuocean.utils.gpu import KernelContext
 
 try:
     from importlib import reload
@@ -53,9 +59,9 @@ class EnsembleFromFiles(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
     """
 
     
-    def __init__(self, gpu_ctx, numParticles,
-                 ensemble_directory,
-                 true_state_directory,
+    def __init__(self, gpu_ctx: KernelContext, numParticles: int,
+                 ensemble_directory: str,
+                 true_state_directory: str,
                  observation_variance,
                  cont_write_netcdf=False,
                  use_lcg = False, xorwow_seed = None,
@@ -93,7 +99,7 @@ class EnsembleFromFiles(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         #print('True state directory: ', true_state_directory)
         
         self.gpu_ctx = gpu_ctx
-        self.gpu_stream = cuda.Stream()
+        self.gpu_stream = GPUStream()
         
         # Control that the ensemble and true state directories exist
         assert os.path.isdir(ensemble_directory), "Ensemble init folder does not exists: " + str(ensemble_directory)
@@ -117,12 +123,12 @@ class EnsembleFromFiles(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         
         # Create the particle array
         self.numParticles = numParticles
-        self.particles = [None]*(self.numParticles)
+        self.particles = [None] * self.numParticles
         
         # Create an array representing active particles
         # If one particle turns bad (e.g., becomes unstable), it is deactivated
         # and not used further in the ensemble.
-        self.particlesActive = [True]*(self.numParticles)
+        self.particlesActive = [True] * self.numParticles
         
         
         # Declare variables for true state and observations
@@ -399,7 +405,7 @@ class EnsembleFromFiles(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
                 dt = self.particles[p].dt 
                 if dt < dt_min:
                     self.deactivateParticle(p, "dt < dt_min")
-                if dt_max > 0.0 and dt > dt_max:
+                if 0.0 < dt_max < dt:
                     self.deactivateParticle(p, "dt > dt_max")
     
     def writeEnsembleToNetCDF(self):

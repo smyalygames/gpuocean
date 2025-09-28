@@ -134,7 +134,7 @@ def generateTruth(gpu_ctx, destination_dir,
         # Create drifters at t = 3 days
         #--------------------------------------------------------------
         drifters = GPUDrifterCollection.GPUDrifterCollection(gpu_ctx, num_drifters,
-                                                             boundaryConditions=doubleJetCase_args['boundary_conditions'],
+                                                             boundary_conditions=doubleJetCase_args['boundary_conditions'],
                                                              domain_size_x=sim.nx*sim.dx, domain_size_y=sim.ny*sim.dy)
         sim.attachDrifters(drifters)
 

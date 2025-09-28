@@ -21,26 +21,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-
-from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
-import time
 import abc
+import typing
 
-from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.drifters import GPUDrifterCollection
+import numpy as np
+import numpy.typing as npt
+
 from gpuocean.utils import Common, WindStress
-from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 
 
 class BaseDrifterEnsemble(object):
     
     __metaclass__ = abc.ABCMeta
         
-    def __init__(self, numParticles, observation_variance=0.0):
+    def __init__(self, num_particles: int, observation_variance=0.0):
                 
-        self.numParticles = numParticles
+        self.numParticles = num_particles
         #self.particles = [None]*(self.numParticles + 1)
         
         self.obs_index = self.numParticles
@@ -69,8 +65,8 @@ class BaseDrifterEnsemble(object):
         self.setParameters(f=sim.f, g=sim.g, beta=sim.coriolis_beta, r=sim.r, wind=sim.wind_stress)
         
     # IMPROVED
-    def setGridInfo(self, nx, ny, dx, dy, dt, 
-                    boundaryConditions=Common.BoundaryConditions(), 
+    def setGridInfo(self, nx, ny, dx, dy, dt,
+                    boundary_conditions=Common.BoundaryConditions(),
                     eta=None, hu=None, hv=None, H=None):
         self.nx = nx
         self.ny = ny
@@ -83,7 +79,7 @@ class BaseDrifterEnsemble(object):
         self.midPoint = 0.5*np.array([self.nx*self.dx, self.ny*self.dy])
         self.initialization_cov = np.eye(2)*self.initialization_variance
         
-        self.boundaryConditions = boundaryConditions
+        self.boundaryConditions = boundary_conditions
         
         assert(self.simType == 'CDKLM16'), 'CDKLM16 is currently the only supported scheme'
         #if self.simType == 'CDKLM16':
@@ -134,10 +130,10 @@ class BaseDrifterEnsemble(object):
     def init(self):
         pass
         
-    def observeParticles(self):
+    def observeParticles(self) -> npt.NDArray:
         return self.drifters.getDrifterPositions()
     
-    def observeTrueState(self):
+    def observeTrueState(self) -> npt.NDArray:
         return self.drifters.getObservationPosition()
     
     def setParticleStates(self, newStates):

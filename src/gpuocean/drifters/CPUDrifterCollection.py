@@ -38,9 +38,10 @@ class CPUDrifterCollection(BaseDrifterCollection.BaseDrifterCollection):
         """
         Creates a GlobalParticles object for drift trajectory ensemble.
 
-        numDrifters: number of drifters in the collection, not included the observation
-        observation_variance: uncertainty of observation position
-        boundaryConditions: BoundaryConditions object, relevant during re-initialization of particles.    
+        Args:
+            numDrifters: number of drifters in the collection, not included the observation
+            observation_variance: uncertainty of observation position
+            boundaryConditions: BoundaryConditions object, relevant during re-initialization of particles.
         """
         
         # Call parent constructor

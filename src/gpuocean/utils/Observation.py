@@ -493,8 +493,8 @@ class Observation:
             dx = self.domain_size_x/self.nx
             dy = self.domain_size_y/self.ny
             for d in range(num_drifters):
-                cell_id_x = np.int(np.floor(current_pos[d,0]/dx))
-                cell_id_y = np.int(np.floor(current_pos[d,1]/dy))
+                cell_id_x = int(np.floor(current_pos[d,0]/dx))
+                cell_id_y = int(np.floor(current_pos[d,1]/dy))
                 waterDepths[d] = Hm[cell_id_y, cell_id_x]
         else:
             waterDepths = np.ones(num_drifters)*waterDepth

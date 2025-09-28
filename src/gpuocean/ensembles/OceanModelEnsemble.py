@@ -22,102 +22,103 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import numpy as np
+from typing import TYPE_CHECKING
 import logging
 import gc
 
+import numpy as np
+
 from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.drifters import GPUDrifterCollection
-from gpuocean.utils import Common, ParticleInfo, Observation
+from gpuocean.utils import ParticleInfo, Observation
 from gpuocean.ensembles import BaseOceanStateEnsemble
+
+if TYPE_CHECKING:
+    from gpuocean.utils.gpu import KernelContext
+
 
 class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
     """
     Class which holds a set of simulators on a single node, possibly with drifters attached
     """
-    
-    def __init__(self, gpu_ctx, sim_args, data_args, model_error_args, numParticles,
-                 observation_variance = 0.01**2, 
-                 initialization_variance_factor_ocean_field = 0.0,
+
+    def __init__(self, gpu_ctx: KernelContext, sim_args, data_args, model_error_args, num_particles: int,
+                 observation_variance=0.01 ** 2,
+                 initialization_variance_factor_ocean_field=0.0,
                  super_dir_name=None, netcdf_filename=None,
                  rank=0):
         """
         Constructor which creates numParticles slighly different ocean models
         based on the same initial conditions
         """
-        
+
         self.logger = logging.getLogger(__name__)
         self.gpu_ctx = gpu_ctx
         self.sim_args = sim_args
         self.data_args = data_args
-        self.numParticles = numParticles
+        self.numParticles = num_particles
         self.observation_variance = observation_variance
         self.initialization_variance_factor_ocean_field = initialization_variance_factor_ocean_field
-        
-        
-        
-        
+
         # Build observation covariance matrix:
         if np.isscalar(self.observation_variance):
-            self.observation_cov = np.eye(2)*self.observation_variance
-            self.observation_cov_inverse = np.eye(2)*(1.0/self.observation_variance)
+            self.observation_cov = np.eye(2) * self.observation_variance
+            self.observation_cov_inverse = np.eye(2) * (1.0 / self.observation_variance)
         else:
             # Assume that we have a correctly shaped matrix here
             self.observation_cov = self.observation_variance
             self.observation_cov_inverse = np.linalg.inv(self.observation_cov)
-            
-            
-            
+
         # Generate ensemble members
-        self.logger.debug("Creating %d particles (ocean models)", numParticles)
-        self.particles = [None] * numParticles
-        self.particleInfos = [None] * numParticles
-        self.drifterForecast = [None] * numParticles
-        for i in range(numParticles):
-            self.particles[i] = CDKLM16.CDKLM16(self.gpu_ctx, **self.sim_args, **data_args, local_particle_id=i, 
+        self.logger.debug(f"Creating {num_particles} particles (ocean models)")
+        self.particles = [None] * num_particles
+        self.particleInfos = [None] * num_particles
+        self.drifterForecast = [None] * num_particles
+        for i in range(num_particles):
+            self.particles[i] = CDKLM16.CDKLM16(self.gpu_ctx, **self.sim_args, **data_args, local_particle_id=i,
                                                 super_dir_name=super_dir_name, netcdf_filename=netcdf_filename)
             if 'small_scale_perturbation_amplitude' in model_error_args:
                 self.particles[i].setSOARModelError(**model_error_args)
             elif 'kl_scaling' in model_error_args:
                 self.particles[i].setKLModelError(**model_error_args)
-                
+
             self.particleInfos[i] = ParticleInfo.ParticleInfo()
-                    
+
             if self.initialization_variance_factor_ocean_field != 0.0:
                 self.particles[i].perturbState(q0_scale=self.initialization_variance_factor_ocean_field)
 
         # Set bookkeeping variables 
         self.nx, self.ny = self.particles[0].nx, self.particles[0].ny
         self.dx, self.dy = self.particles[0].dx, self.particles[0].dy
-        self.t  = self.particles[0].t
+        self.t = self.particles[0].t
 
-        self.particlesActive = [True]*(numParticles)
-            
-    
+        self.particlesActive = [True] * num_particles
+
     def attachDrifters(self, drifter_positions):
         for i in range(self.numParticles):
-        # Attach drifters if requested
-            self.logger.debug("Attaching %d drifters", len(drifter_positions))
-            if (len(drifter_positions) > 0):
+            # Attach drifters if requested
+            self.logger.debug(f"Attaching {len(drifter_positions)} drifters")
+            if len(drifter_positions) > 0:
                 drifters = GPUDrifterCollection.GPUDrifterCollection(self.gpu_ctx, len(drifter_positions),
                                                                      observation_variance=self.observation_variance,
-                                                                     boundaryConditions=self.data_args['boundary_conditions'],
-                                                                     domain_size_x=self.data_args['nx']*self.data_args['dx'], 
-                                                                     domain_size_y=self.data_args['ny']*self.data_args['dy'])
+                                                                     boundary_conditions=self.data_args[
+                                                                         'boundary_conditions'],
+                                                                     domain_size_x=self.data_args['nx'] *
+                                                                                   self.data_args['dx'],
+                                                                     domain_size_y=self.data_args['ny'] *
+                                                                                   self.data_args['dy'])
                 drifters.setDrifterPositions(drifter_positions)
                 self.particles[i].attachDrifters(drifters)
-                
+
                 self.drifterForecast[i] = Observation.Observation()
                 self.drifterForecast[i].add_observation_from_sim(self.particles[i])
-    
+
     def cleanUp(self):
         for oceanState in self.particles:
             if oceanState is not None:
                 oceanState.cleanUp(do_gc=False)
         gc.collect()
-    
-    
-    
+
     def stepToObservation(self, observation_time, write_now=False):
         """
         Advance the ensemble to the given observation time, and mimics CDKLM16.dataAssimilationStep function
@@ -127,14 +128,13 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
             write_now: Write result to NetCDF if an writer is active.
         """
         for p in range(self.numParticles):
-        
+
             # Only active particles are evolved
             if self.particlesActive[p]:
                 self.particles[p].dataAssimilationStep(observation_time, write_now=write_now)
 
         self.t = observation_time
 
-    
     def modelStep(self, sub_t, rank="", update_dt=True):
         """
         Function which makes all particles step until time t.
@@ -143,12 +143,12 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         particle = 0
         for p in self.particles:
             self.t = p.step(sub_t)
-            if(update_dt):
+            if (update_dt):
                 p.updateDt()
                 self.logger.debug("[" + str(rank) + "]: Particle " + str(particle) + " has dt " + str(p.dt))
             particle += 1
         return self.t
-    
+
     def updateDt(self):
         """
         Function that updates dt for all particles.
@@ -156,11 +156,11 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         self.logger.debug("Updating dt on all particles (ocean models)")
         for p in self.particles:
             p.updateDt()
-    
+
     def dumpParticleSample(self, drifter_cells):
         for i in range(self.numParticles):
             self.particleInfos[i].add_state_sample_from_sim(self.particles[i], drifter_cells)
-            
+
     def dumpForecastParticleSample(self):
         for i in range(self.numParticles):
             self.drifterForecast[i].add_observation_from_sim(self.particles[i])
@@ -181,22 +181,22 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         """
         numParticles = len(self.particles)
         num_drifters = len(drifter_positions)
-        
+
         observed_values = np.empty((numParticles, num_drifters, 2))
-        
+
         for p in range(numParticles):
             # Downloading ocean state without ghost cells
             eta, hu, hv = self.particles[p].download(interior_domain_only=True)
 
             for d in range(num_drifters):
-                id_x = np.int(np.floor(drifter_positions[d, 0]/self.data_args['dx']))
-                id_y = np.int(np.floor(drifter_positions[d, 1]/self.data_args['dy']))
-                
-                observed_values[p,d,0] = hu[id_y, id_x]
-                observed_values[p,d,1] = hv[id_y, id_x]
-                
+                id_x = int(np.floor(drifter_positions[d, 0] / self.data_args['dx']))
+                id_y = int(np.floor(drifter_positions[d, 1] / self.data_args['dy']))
+
+                observed_values[p, d, 0] = hu[id_y, id_x]
+                observed_values[p, d, 1] = hv[id_y, id_x]
+
         return observed_values
-        
+
     def dumpParticleInfosToFiles(self, filename_prefix):
         """
         Default file name of dump will be particle_info_YYYY_mm_dd-HH_MM_SS_{rank}_{local_particle_id}.bz2
@@ -204,7 +204,7 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         for p in range(self.getNumParticles()):
             filename = filename_prefix + "_" + str(p) + ".bz2"
             self.particleInfos[p].to_pickle(filename)
-            
+
     def dumpDrifterForecastToFiles(self, filename_prefix):
         """
         Default file name of dump will be forecast_particle_info_YYYY_mm_dd-HH_MM_SS_{rank}_{local_particle_id}.bz2
@@ -212,7 +212,7 @@ class OceanModelEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         for p in range(self.getNumParticles()):
             filename = filename_prefix + "_" + str(p) + ".bz2"
             self.drifterForecast[p].to_pickle(filename)
-        
+
     def syncGPU(self):
         for p in range(self.getNumParticles()):
             self.particles[p].gpu_stream.synchronize()

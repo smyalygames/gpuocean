@@ -30,6 +30,7 @@ from IPython.core.magic import line_magic, Magics, magics_class
 import pycuda.driver as cuda
 
 from gpuocean.utils import Common
+from gpuocean.utils.gpu import KernelContext
 
 
 
@@ -58,7 +59,7 @@ class MyIPythonMagic(Magics):
         else:
             self.logger.debug("Creating context")
             use_cache = False if args.no_cache else True
-            self.shell.user_ns[args.name] = Common.CUDAContext(blocking=args.blocking, use_cache=use_cache)
+            self.shell.user_ns[args.name] = KernelContext(blocking=args.blocking, use_cache=use_cache)
         
         # this function will be called on exceptions in any cell
         def custom_exc(shell, etype, evalue, tb, tb_offset=None):

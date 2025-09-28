@@ -367,8 +367,8 @@ class LEnKFOcean:
         # Precalculate rolling (for StaticBuoys this just have to be once)
         if self.all_Ls is None or self.observations.observation_type != dautils.ObservationType.StaticBuoys:
             self.all_Ls = [None]*self.N_d
-            self.all_xrolls = np.zeros(self.N_d, dtype=np.int)
-            self.all_yrolls = np.zeros(self.N_d, dtype=np.int)
+            self.all_xrolls = np.zeros(self.N_d, dtype=np.int32)
+            self.all_yrolls = np.zeros(self.N_d, dtype=np.int32)
 
             for d in range(self.N_d):
                 # Collecting rolling information (xroll and yroll are 0)
@@ -602,8 +602,8 @@ class LEnKFOcean:
         observedParticles = np.empty((active_particles, self.N_d, 2))
         
         for d in range(self.N_d):
-            id_x = np.int(np.floor(observations[d,0]/self.ensemble.dx))
-            id_y = np.int(np.floor(observations[d,1]/self.ensemble.dy))
+            id_x = int(np.floor(observations[d,0]/self.ensemble.dx))
+            id_y = int(np.floor(observations[d,1]/self.ensemble.dy))
 
                 
             observedParticles[:, d, 0] = X_f[:, 1, id_y, id_x]
@@ -616,8 +616,8 @@ class LEnKFOcean:
         
         Y_loc = (y_loc + np.random.multivariate_normal(mean=np.zeros(2), cov=self.ensemble.getObservationCov(), size=self.N_e)).T
 
-        id_x = np.int(np.floor(observations_xy[0]/self.ensemble.dx))
-        id_y = np.int(np.floor(observations_xy[1]/self.ensemble.dy))
+        id_x = int(np.floor(observations_xy[0]/self.ensemble.dx))
+        id_y = int(np.floor(observations_xy[1]/self.ensemble.dy))
         
 
         if self.observations.observation_type == dautils.ObservationType.StaticBuoys and hasattr(self, "eta_compensation"):

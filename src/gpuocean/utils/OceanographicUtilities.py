@@ -73,15 +73,15 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
     Converts cell values at midpoints to cell values at midpoints using a cubic
     interpolating spline to generate first guess, followed by an iterative update. 
     """
-    def genIntersections(midpoints, use_minmod):
-        if (use_minmod):
+    def genIntersections(midpoints, use_minmod: bool):
+        if use_minmod:
             dx = minmodX(midpoints.data)
             dy = minmodY(midpoints.data)
         else:
             dx, dy = np.gradient(midpoints.data)
             
         mask = None
-        if (np.ma.is_masked(midpoints)):
+        if np.ma.is_masked(midpoints):
             mask = midpoints.mask
         else:
             mask = np.zeros(midpoints.shape, dtype=np.bool)
@@ -116,10 +116,10 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
         
         # First count number of valid cells 
         # for each intersection
-        count = 4 - (np.int32(mask[1:, 1:]) \
-                + np.int32(mask[:-1, 1:]) \
-                + np.int32(mask[:-1, :-1]) \
-                + np.int32(mask[1:, :-1]))
+        count = 4 - (int(mask[1:, 1:])
+                + int(mask[:-1, 1:])
+                + int(mask[:-1, :-1])
+                + int(mask[1:, :-1]))
 
         # Then set the average
         values = midpoints.data[1:, 1:] + midpoints.data[:-1, 1:] + midpoints.data[:-1, :-1] + midpoints.data[1:, :-1]
@@ -138,7 +138,7 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
     a_i = np.clip(a_i, vmin, vmax)
     
     a_i_old = None
-    if (compute_convergence):
+    if compute_convergence:
         a_i_old = a_i.copy()
     
     # Iteratively refine intersections estimate
@@ -151,16 +151,16 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
     for i in range(2*iterations+1):        
         delta[1:-1,1:-1] = a_m.data[1:-1,1:-1] - intersectionsToMidpoints(a_i.data)
         
-        if (np.ma.is_masked(a_m)):
+        if np.ma.is_masked(a_m):
             delta = np.ma.array(delta, mask=a_m.mask.copy())
         else:
             delta = np.ma.array(delta, mask=np.zeros(a_m.shape, dtype=np.bool))
         
-        if (i%2 == 0):
-            count = 4 - (np.int32(delta.mask[1:, 1:]) \
-                    + np.int32(delta.mask[:-1, 1:]) \
-                    + np.int32(delta.mask[:-1, :-1]) \
-                    + np.int32(delta.mask[1:, :-1]))
+        if i % 2 == 0:
+            count = 4 - (int(delta.mask[1:, 1:])
+                         + int(delta.mask[:-1, 1:])
+                         + int(delta.mask[:-1, :-1])
+                         + int(delta.mask[1:, :-1]))
             delta_sum = (delta[:-1, :-1] + delta[:-1, 1:] + delta[1:, 1:] + delta[1:, :-1])
             delta_i = np.zeros(a_i.shape)
             delta_i[count>2] = delta_sum[count>2] / count[count>2]
@@ -292,8 +292,8 @@ def rescaleMidpoints(data, nx1, ny1, **kwargs):
 
         x1, y1 = np.meshgrid(x1, y1)
         
-        i = np.int32(x1)
-        j = np.int32(y1)
+        i = int(x1)
+        j = int(y1)
         
         s = x1 - (i+0.5)
         t = y1 - (j+0.5)
@@ -336,8 +336,8 @@ def rescaleIntersections(data, nx1, ny1, **kwargs):
         x1, y1 = np.meshgrid(x1, y1)
         
         #Get indices of four nearest neighbors
-        i = np.int32(x1)
-        j = np.int32(y1)
+        i = int(x1)
+        j = int(y1)
         k = np.minimum(i+1, nx0-1)
         l = np.minimum(j+1, ny0-1)
         

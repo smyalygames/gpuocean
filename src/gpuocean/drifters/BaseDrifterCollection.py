@@ -26,11 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import time
 import abc
 
 from gpuocean.utils import Common
-from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 
 class BaseDrifterCollection(object):    
     """
@@ -40,8 +38,8 @@ class BaseDrifterCollection(object):
     
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, numDrifters, observation_variance=0.1, \
-                 boundaryConditions=Common.BoundaryConditions(), \
+    def __init__(self, numDrifters, observation_variance=0.1,
+                 boundaryConditions=Common.BoundaryConditions(),
                  domain_size_x=1.0, domain_size_y=1.0):
         """
         Creates a GlobalParticles object for drift trajectory ensemble.
@@ -146,8 +144,8 @@ class BaseDrifterCollection(object):
         """
         # Define mid-points for the different drifters k
         # Decompose the domain, so that we spread the drifters as much as possible
-        sub_domains_y = np.int(np.round(np.sqrt(self.numDrifters)))
-        sub_domains_x = np.int(np.ceil(1.0*self.numDrifters/sub_domains_y))
+        sub_domains_y = int(np.round(np.sqrt(self.numDrifters)))
+        sub_domains_x = int(np.ceil(1.0*self.numDrifters/sub_domains_y))
         drifterPositions = np.empty((self.numDrifters, 2))
        
         for sub_y in range(sub_domains_y):
@@ -190,7 +188,7 @@ class BaseDrifterCollection(object):
                 for i in range(self.getNumDrifters()):
                     x = periodicPositions[i,0]
                     
-                    pos_x = np.array([x - self.getDomainSizeX(), x, \
+                    pos_x = np.array([x - self.getDomainSizeX(), x,
                                       x + self.getDomainSizeX()])
                     dist_x = np.abs(pos_x - obs_x)
                     periodicPositions[i,0] = pos_x[np.argmin(dist_x)]
@@ -199,7 +197,7 @@ class BaseDrifterCollection(object):
                 for i in range(self.getNumDrifters()):
                     y = periodicPositions[i,1]
                     
-                    pos_y = np.array([y - self.getDomainSizeY(), y, \
+                    pos_y = np.array([y - self.getDomainSizeY(), y,
                                       y + self.getDomainSizeY()])
                     dist_y = np.abs(pos_y - obs_y)
                     periodicPositions[i,1] = pos_y[np.argmin(dist_y)]
@@ -372,9 +370,9 @@ class BaseDrifterCollection(object):
         
         # PLOT POSITIONS OF PARTICLES AND OBSERVATIONS
         ax0 = plt.subplot2grid((2,3), (0,0))
-        plt.plot(self.getDrifterPositions()[:,0], \
+        plt.plot(self.getDrifterPositions()[:,0],
                  self.getDrifterPositions()[:,1], 'b.')
-        plt.plot(self.getObservationPosition()[0], \
+        plt.plot(self.getObservationPosition()[0],
                  self.getObservationPosition()[1], 'r.')
         collectionMean = self.getCollectionMean()
         if collectionMean is not None:
@@ -389,8 +387,8 @@ class BaseDrifterCollection(object):
         ax0 = plt.subplot2grid((2,3), (0,1), colspan=2)
         distances = self.getDistances()
         obs_var = self.getObservationVariance()
-        plt.hist(distances, bins=30, \
-                 range=(0, max(min(self.getDomainSizeX(), self.getDomainSizeY()), np.max(distances))),\
+        plt.hist(distances, bins=30,
+                 range=(0, max(min(self.getDomainSizeX(), self.getDomainSizeY()), np.max(distances))),
                  normed=True, label="particle distances")
         
         # With observation 

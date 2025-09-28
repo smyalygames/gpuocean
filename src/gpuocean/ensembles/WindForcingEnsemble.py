@@ -24,16 +24,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import time
+import abc
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import time
-import abc
 
 from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.drifters import GPUDrifterCollection
-from gpuocean.utils import Common, WindStress
+from gpuocean.utils import WindStress
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 from gpuocean.ensembles import BaseOceanStateEnsemble
 
@@ -58,13 +58,13 @@ class WindForcingEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
             wind = WindStress.WindStress(self.windT, wX, wY)
             #print ("Init with wind :", (wX, wY))
             
-            self.particles[i] = CDKLM16.CDKLM16(self.gpu_ctx, \
-                                                self.base_eta, self.base_hu, self.base_hv, \
-                                                self.base_H, \
-                                                self.nx, self.ny, self.dx, self.dy, self.dt, \
-                                                self.g, self.f, self.r, \
-                                                wind_stress=wind, \
-                                                boundary_conditions=self.boundaryConditions, \
+            self.particles[i] = CDKLM16.CDKLM16(self.gpu_ctx,
+                                                self.base_eta, self.base_hu, self.base_hv,
+                                                self.base_H,
+                                                self.nx, self.ny, self.dx, self.dy, self.dt,
+                                                self.g, self.f, self.r,
+                                                wind_stress=wind,
+                                                boundary_conditions=self.boundaryConditions,
                                                 write_netcdf=False)
             if i == self.numParticles:
                 # All particles done, only the observation is left,
@@ -73,9 +73,9 @@ class WindForcingEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
                 driftersPerOceanModel = 1
             
             drifters = GPUDrifterCollection.GPUDrifterCollection(self.gpu_ctx, driftersPerOceanModel,
-                                             observation_variance=self.observation_variance,
-                                             boundaryConditions=self.boundaryConditions,
-                                             domain_size_x=self.nx*self.dx, domain_size_y=self.ny*self.dy)
+                                                                 observation_variance=self.observation_variance,
+                                                                 boundary_conditions=self.boundaryConditions,
+                                                                 domain_size_x=self.nx*self.dx, domain_size_y=self.ny*self.dy)
             initPos = np.random.multivariate_normal(self.midPoint, self.initialization_cov_drifters, driftersPerOceanModel)
             drifters.setDrifterPositions(initPos)
             #print "drifter particles: ", drifter.getParticlePositions()

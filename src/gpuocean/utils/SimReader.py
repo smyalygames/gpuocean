@@ -23,41 +23,44 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-
 import numpy as np
-import datetime
+import numpy.typing as npt
 from netCDF4 import Dataset
+import matplotlib.pyplot
+from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
-from matplotlib import animation, rc
+from matplotlib import animation
 
-from gpuocean.utils import PlotHelper, Common
+from gpuocean.utils import PlotHelper
+from gpuocean.utils.Common import BoundaryConditions
+
+grid_array = npt.NDArray[np.float32 | np.float64]
 
 
 class SimNetCDFReader:
 
-    def __init__(self, filename, ignore_ghostcells=True):
-        
+    def __init__(self, filename: str, ignore_ghostcells=True):
+
         self.filename = filename
         self.ignore_ghostcells = ignore_ghostcells
-        
+
         self.ncfile = Dataset(filename, 'r')
-        
-        self.ghostCells = [self.ncfile.getncattr('ghost_cells_north'), \
-                           self.ncfile.getncattr('ghost_cells_east'), \
-                           self.ncfile.getncattr('ghost_cells_south'), \
+
+        self.ghostCells = [self.ncfile.getncattr('ghost_cells_north'),
+                           self.ncfile.getncattr('ghost_cells_east'),
+                           self.ncfile.getncattr('ghost_cells_south'),
                            self.ncfile.getncattr('ghost_cells_west')]
         self.staggered_grid = str(self.ncfile.getncattr('staggered_grid')) == 'True'
 
         self.text_font_size = 12
-        
-    def get(self, attr):
+
+    def get(self, attr: str):
         try:
             return self.ncfile.getncattr(attr)
         except:
             return "not found"
-        
-    def has(self, fieldname):
+
+    def has(self, fieldname: str) -> bool:
         try:
             tmp = self.ncfile.getncattr(fieldname)
             return True
@@ -67,47 +70,46 @@ class SimNetCDFReader:
                 return True
             except:
                 return False
-        
-    def printVariables(self):
+
+    def printVariables(self) -> None:
         for var in self.ncfile.variables:
             print(var)
-        
-    def printAttributes(self):
+
+    def printAttributes(self) -> None:
         for attr in self.ncfile.ncattrs():
             print(attr + "\t--> " + str(self.ncfile.getncattr(attr)))
-    
-    def getNumTimeSteps(self):
+
+    def getNumTimeSteps(self) -> int:
         time = self.ncfile.variables['time']
-        #for t in time:
-            #print t
+        # for t in time:
+        # print t
         return time.size
-    
-    def getBC(self):
-        bc = Common.BoundaryConditions.fromstring(self.get("boundary_conditions"))
+
+    def getBC(self) -> BoundaryConditions:
+        bc = BoundaryConditions.fromstring(self.get("boundary_conditions"))
         return bc
 
-    
-    def getTimes(self):
+    def getTimes(self) -> grid_array:
         return self.ncfile.variables['time'][:]
-    
-    def getLastTimeStep(self):
+
+    def getLastTimeStep(self) -> tuple[grid_array, grid_array, grid_array, float]:
         return self.getTimeStep(-1)
-        
-    def getTimeStep(self, index):
+
+    def getTimeStep(self, index: int) -> tuple[grid_array, grid_array, grid_array, float]:
         time = self.ncfile.variables['time']
-        eta  = self.ncfile.variables['eta'][index, :, :]
+        eta = self.ncfile.variables['eta'][index, :, :]
         hu = self.ncfile.variables['hu'][index, :, :]
         hv = self.ncfile.variables['hv'][index, :, :]
         if self.ignore_ghostcells:
             eta = eta[self.ghostCells[2]:-self.ghostCells[0], \
-                      self.ghostCells[3]:-self.ghostCells[1]]
+                self.ghostCells[3]:-self.ghostCells[1]]
             hu = hu[self.ghostCells[2]:-self.ghostCells[0], \
-                  self.ghostCells[3]:-self.ghostCells[1]]
+                self.ghostCells[3]:-self.ghostCells[1]]
             hv = hv[self.ghostCells[2]:-self.ghostCells[0], \
-                  self.ghostCells[3]:-self.ghostCells[1]]
-        return eta, hu, hv, np.float32(time[index])
-    
-    def getH(self):
+                self.ghostCells[3]:-self.ghostCells[1]]
+        return eta, hu, hv, time[index]
+
+    def getH(self) -> grid_array:
         if self.has('H'):
             H = self.ncfile.variables['H'][:, :]
         else:
@@ -116,12 +118,11 @@ class SimNetCDFReader:
             else:
                 H = self.ncfile.variables['Hi'][:, :]
         return H
-    
-    def getHm(self):
+
+    def getHm(self) -> list[grid_array]:
         return self.ncfile.variables['Hm'][:, :]
-        
-    
-    def getStateAtTime(self, time):
+
+    def getStateAtTime(self, time: float) -> tuple[grid_array, grid_array, grid_array, float]:
         time = np.round(time)
         nc_times = self.ncfile.variables['time']
         index = None
@@ -131,74 +132,70 @@ class SimNetCDFReader:
                 break
         if index is None:
             raise RuntimeError('Time ' + str(time) + ' not in NetCDF file ' + self.filename)
-        #print("Found time " + str(time) + " at index " + str(i))
-        return self.getStateAtTimeStep(i)
-    
-    
-        
-    def getStateAtTimeStep(self, index, etaOnly=False):
+        # print("Found time " + str(time) + " at index " + str(i))
+        return self.getStateAtTimeStep(index)
+
+    def getStateAtTimeStep(self, index: int, etaOnly=False) -> tuple[grid_array, float] | tuple[
+        grid_array, grid_array, grid_array, float]:
         time = self.ncfile.variables['time']
         eta = self.ncfile.variables['eta'][index, :, :]
         if self.ignore_ghostcells:
             eta = eta[self.ghostCells[2]:-self.ghostCells[0], \
-                      self.ghostCells[3]:-self.ghostCells[1]]
+                self.ghostCells[3]:-self.ghostCells[1]]
         if etaOnly:
             return eta, time[index]
         hu = self.ncfile.variables['hu'][index, :, :]
         hv = self.ncfile.variables['hv'][index, :, :]
         if self.ignore_ghostcells:
             hu = hu[self.ghostCells[2]:-self.ghostCells[0], \
-                    self.ghostCells[3]:-self.ghostCells[1]]
+                self.ghostCells[3]:-self.ghostCells[1]]
             hv = hv[self.ghostCells[2]:-self.ghostCells[0], \
-                    self.ghostCells[3]:-self.ghostCells[1]]
+                self.ghostCells[3]:-self.ghostCells[1]]
         return eta, hu, hv, time[index]
 
-    def getEtaAtTimeStep(self, index):
+    def getEtaAtTimeStep(self, index: int) -> tuple[grid_array, float]:
         return self.getStateAtTimeStep(index, etaOnly=True)
 
-    def getAxis(self):
+    def getAxis(self) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
         x = self.ncfile.variables['x']
         y = self.ncfile.variables['y']
         if self.ignore_ghostcells:
             x = x[self.ghostCells[2]:-self.ghostCells[0]]
             y = y[self.ghostCells[3]:-self.ghostCells[1]]
         return x, y
-    
-    def getEtaXSlice(self, t, y):
+
+    def getEtaXSlice(self, t: float, y: int) -> grid_array:
         y_index = int(y) + int(self.get('ghost_cells_south'))
-        return self.ncfile.variables['eta'][t, y_index, self.ghostCells[3]:-self.ghostCells[1] ]
-    
-    def _animate(self, i):
+        return self.ncfile.variables['eta'][t, y_index, self.ghostCells[3]:-self.ghostCells[1]]
+
+    def _animate(self, i: int) -> None:
         eta1, u1, v1, t = self.getTimeStep(i)
         self.plotter.plot(eta1, u1, v1)
-                
 
-    
-    def makeAnimation(self):
+    def makeAnimation(self) -> FuncAnimation:
         nx = self.ncfile.getncattr('nx')
         ny = self.ncfile.getncattr('ny')
         dx = self.ncfile.getncattr('dx')
         dy = self.ncfile.getncattr('dy')
-        #Calculate radius from center for plotting
-        x_center = dx*nx*0.5
-        y_center = dy*ny*0.5
-        y_coords, x_coords = np.mgrid[0:ny*dy:dy, 0:nx*dx:dx]
+        # Calculate radius from center for plotting
+        x_center = dx * nx * 0.5
+        y_center = dy * ny * 0.5
+        y_coords, x_coords = np.mgrid[0:ny * dy:dy, 0:nx * dx:dx]
         x_coords = np.subtract(x_coords, x_center)
         y_coords = np.subtract(y_coords, y_center)
         radius = np.sqrt(np.multiply(x_coords, x_coords) + np.multiply(y_coords, y_coords))
 
         eta0, hu0, hv0, t0 = self.getTimeStep(0)
         fig = plt.figure()
-        self.plotter = PlotHelper.PlotHelper(fig, x_coords, y_coords, radius, \
+        self.plotter = PlotHelper.PlotHelper(fig, x_coords, y_coords, radius,
                                              eta0, hu0, hv0)
 
         anim = animation.FuncAnimation(fig, self._animate, range(self.getNumTimeSteps()), interval=100)
         plt.close(anim._fig)
         return anim
-        
 
-    def _addText(self, ax, msg):
-        bp = 70 # breakpoint
+    def _addText(self, ax: matplotlib.pyplot.Axes, msg: str) -> None:
+        bp = 70  # breakpoint
         if len(msg) > bp:
             rest = '     ' + msg[bp:]
             ax.text(0.1, self.textPos, msg[0:bp], fontsize=self.text_font_size)
@@ -206,16 +203,16 @@ class SimNetCDFReader:
             self._addText(ax, rest)
         else:
             ax.text(0.1, self.textPos, msg, fontsize=self.text_font_size)
-            #print len(msg)
+            # print len(msg)
             self.textPos -= 0.2
 
-    def makeInfoPlot(self, ax, text_font_size=8):
+    def makeInfoPlot(self, ax: matplotlib.pyplot.Axes, text_font_size=8) -> None:
         self.text_font_size = text_font_size
         self.textPos = 2.3
         # Ax is the subplot object
         ax.text(1, 2.8, 'NetCDF INFO', fontsize=self.text_font_size)
-        
-        #self._addText(ax, 'working directory: ' + self.current_directory)
+
+        # self._addText(ax, 'working directory: ' + self.current_directory)
         self._addText(ax, 'filename: ' + self.filename)
         self._addText(ax, '')
         self._addText(ax, 'git hash: ' + self.get('git_hash'))
@@ -223,7 +220,8 @@ class SimNetCDFReader:
         self._addText(ax, 'Simulator: ' + self.get('simulator_short'))
         self._addText(ax, 'BC: ' + self.get('boundary_conditions'))
         self._addText(ax, 'f:  ' + str(self.get('coriolis_force')) + ', beta: ' + str(self.get('coriolis_beta')))
-        self._addText(ax, 'dt: ' + str(self.get('dt')) + ", auto_dt: " + self.get('auto_dt') + ", dx: " + str(self.get('dx')) + ", dy: " + str(self.get('dy')))
+        self._addText(ax, 'dt: ' + str(self.get('dt')) + ", auto_dt: " + self.get('auto_dt') + ", dx: " + str(
+            self.get('dx')) + ", dy: " + str(self.get('dy')))
         self._addText(ax, 'wind type: ' + str(self.get('wind_stress_source')))
-        
-        ax.axis([0, 6, 0, 3])
+
+        ax.axis((0, 6, 0, 3))

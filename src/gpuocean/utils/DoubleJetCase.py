@@ -26,13 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
-import scipy.integrate
 import warnings
 
-if scipy.__version__.startswith('1.4'):
-    from scipy.integrate.quadrature import AccuracyWarning
-else:
-    from scipy.integrate._quadrature import AccuracyWarning
+from scipy import integrate
+
+# if scipy.__version__.startswith('1.4'):
+#     from scipy.integrate.quadrature import AccuracyWarning
+# else:
+#     from scipy.integrate import
     
 from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.utils import Common
@@ -80,15 +81,15 @@ class DoubleJetPerturbationType:
     
     @staticmethod
     def _assert_valid(pert_type):
-        assert(pert_type == DoubleJetPerturbationType.SteadyState or \
-               pert_type == DoubleJetPerturbationType.StandardPerturbedState or \
-               pert_type == DoubleJetPerturbationType.NormalPerturbedState or \
-               pert_type == DoubleJetPerturbationType.UniformPerturbedState or \
-               pert_type == DoubleJetPerturbationType.ModelErrorPerturbation or \
-               pert_type == DoubleJetPerturbationType.SpinUp or \
-               pert_type == DoubleJetPerturbationType.NormalPerturbedSpinUp or \
-               pert_type == DoubleJetPerturbationType.LowFrequencySpinUp or \
-               pert_type == DoubleJetPerturbationType.LowFrequencyStandardSpinUp or \
+        assert(pert_type == DoubleJetPerturbationType.SteadyState or
+               pert_type == DoubleJetPerturbationType.StandardPerturbedState or
+               pert_type == DoubleJetPerturbationType.NormalPerturbedState or
+               pert_type == DoubleJetPerturbationType.UniformPerturbedState or
+               pert_type == DoubleJetPerturbationType.ModelErrorPerturbation or
+               pert_type == DoubleJetPerturbationType.SpinUp or
+               pert_type == DoubleJetPerturbationType.NormalPerturbedSpinUp or
+               pert_type == DoubleJetPerturbationType.LowFrequencySpinUp or
+               pert_type == DoubleJetPerturbationType.LowFrequencyStandardSpinUp or
                pert_type == DoubleJetPerturbationType.IEWPFPaperCase), \
         'Provided double jet perturbation type ' + str(pert_type) + ' is invalid'
 
@@ -373,7 +374,7 @@ class DoubleJetCase:
         Main function for creating the unperturbed steady-state initial conditions
         """
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=AccuracyWarning)
+            warnings.filterwarnings('ignore', category=integrate.IntegrationWarning)
             #warnings.simplefilter('ignore', scipy.integrate.quadrature.AccuracyWarning)
             #warnings.simplefilter('ignore', AccuracyWarning)
             #warnings.simplefilter('ignore',DeprecationWarning)
@@ -422,7 +423,7 @@ class DoubleJetCase:
         else:
             out = np.zeros_like(lat)
             for i in range(len(lat)):
-                if lat[i] > self.phi_0 and lat[i] <= self.phi_1:
+                if self.phi_0 < lat[i] <= self.phi_1:
                     out[i] = self._init_u_scalar(lat[i])
                 if out[i] == np.inf:
                     out[i] = 0.0
@@ -442,5 +443,5 @@ class DoubleJetCase:
         gh0 = np.zeros_like(lat)
 
         for i in range(lat.size):
-            gh0[i] = self.g*self.h_0 - scipy.integrate.quadrature(self._init_h_integrand, self.phi_0, lat[i])[0]
+            gh0[i] = self.g*self.h_0 - integrate.quad(self._init_h_integrand, self.phi_0, lat[i])[0]
         return gh0/self.g
