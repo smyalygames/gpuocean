@@ -90,9 +90,11 @@ class HIPContext(Context):
         if jit_compile_args is None:
             jit_compile_args = {}
 
-        compile_args = compile_args.get('')
+        # FIXME add back compiler arguments
+        compile_args = []
+        # compile_args = compile_args.get('')
 
-        compile_args = [bytes(arg, "utf-8") for arg in compile_args]
+        # compile_args = [bytes(arg, "utf-8") for arg in compile_args]
         compile_args.append(b"--offload-arch=" + self.arch)
 
         kernel_filename = os.path.normpath(kernel_filename + ".hip")
