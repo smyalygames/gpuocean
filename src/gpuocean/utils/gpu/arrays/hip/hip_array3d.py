@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class HIPArray3D(BaseArray3D):
     """
-    Class that holds 2D HIP data
+    Class that holds 3D HIP data
     """
 
     def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, nc: int, data: data_t,
