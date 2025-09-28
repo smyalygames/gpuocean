@@ -376,16 +376,16 @@ class BoundaryConditions:
         west = keyword_to_cond(bc_array[7])
 
         if len(bc_array) > 13:
-            sponge_cells = {bc_array[9]: np.int32(bc_array[10]),
-                            bc_array[11]: np.int32(bc_array[12]),
-                            bc_array[13]: np.int32(bc_array[14]),
-                            bc_array[15]: np.int32(bc_array[16])}
+            sponge_cells = {bc_array[9]: int(bc_array[10]),
+                            bc_array[11]: int(bc_array[12]),
+                            bc_array[13]: int(bc_array[14]),
+                            bc_array[15]: int(bc_array[16])}
             sponge_cells = SpongeCells(**sponge_cells)
         else:
-            sponge_cells = SpongeCells(np.int32(bc_array[9]),
-                            np.int32(bc_array[10]),
-                            np.int32(bc_array[11]),
-                            np.int32(bc_array[12]))
+            sponge_cells = SpongeCells(int(bc_array[9]),
+                            int(bc_array[10]),
+                            int(bc_array[11]),
+                            int(bc_array[12]))
 
         return cls(north=north, east=east, south=south, west=west, sponge_cells=sponge_cells)
 
