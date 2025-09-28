@@ -23,11 +23,9 @@ class HIPHandler(BaseGPUHandler):
 
         for i in range(len(args)):
             val = args[i]
-            if isinstance(val, np.int64):
-                args[i] = ctypes.c_int64(val)
-            elif isinstance(val, (int, np.int32)):
+            if isinstance(val, int):
                 args[i] = ctypes.c_int32(val)
-            elif isinstance(val, (float, np.float32, np.float64)):
+            elif isinstance(val, float):
                 args[i] = ctypes.c_float(val)
 
         args = tuple(args)
