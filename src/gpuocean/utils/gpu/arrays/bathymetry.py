@@ -33,7 +33,7 @@ class Bathymetry:
         self.boundary_conditions = boundary_conditions
 
         # Set land value (if masked array)
-        self.mask_value = np.float32(1.0e20)
+        self.mask_value = 1.0e20
         self.use_mask = False
         if np.ma.is_masked(Bi_host):
             Bi_host = Bi_host.copy().filled(self.mask_value).astype(np.float32)
@@ -60,10 +60,10 @@ class Bathymetry:
         self.boundaryKernels = gpu_ctx.get_kernel("boundary_kernels",
                                                   defines={'block_width': block_width, 'block_height': block_height,
                                                            # setting dummy variables as they need to be defined
-                                                           'BC_NS_NX': int(-1),
-                                                           'BC_NS_NY': int(-1),
-                                                           'BC_EW_NX': int(-1),
-                                                           'BC_EW_NY': int(-1),
+                                                           'BC_NS_NX': -1,
+                                                           'BC_NS_NY': -1,
+                                                           'BC_EW_NX': -1,
+                                                           'BC_EW_NY': -1,
                                                            })
 
         # Get CUDA functions and define data types for prepared_{async_}call()
