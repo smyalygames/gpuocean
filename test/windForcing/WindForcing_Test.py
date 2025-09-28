@@ -21,26 +21,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
-import numpy as np
-import sys
 import gc
 
 from testUtils import *
 
 from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.drifters import GPUDrifterCollection
-from gpuocean.utils import Common, WindStress
+from gpuocean.utils import WindStress
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
+from gpuocean.utils.gpu import KernelContext
+
 
 class WindForcingTest(unittest.TestCase):
     def setUp(self):
         self.N_winds = 12
 
-        self.gpu_ctx = Common.CUDAContext()
+        self.gpu_ctx = KernelContext()
 
         self.gpu_ctx_winds = []
         for i in range(self.N_winds):
             # Generating new contextes without iPythonMagic requires to reset the kernel every time it crashes 
-            self.gpu_ctx_winds.append( Common.CUDAContext() )
+            self.gpu_ctx_winds.append( KernelContext() )
 
 
         self.nx = 100
@@ -63,7 +64,8 @@ class WindForcingTest(unittest.TestCase):
         self.hv0 = np.zeros(self.dataShape, dtype=np.float32)
         self.Hi = 10 * np.ones((self.dataShape[0]+1, self.dataShape[1]+1), dtype=np.float32, order='C')
 
-        self.boundary_conditions = Common.BoundaryConditions(2,2,2,2)
+        self.boundary_conditions = BoundaryConditions(BoundaryType.PERIODIC, BoundaryType.PERIODIC,
+                                                      BoundaryType.PERIODIC, BoundaryType.PERIODIC)
 
         self.T = 600
 
@@ -73,17 +75,17 @@ class WindForcingTest(unittest.TestCase):
 
         wind4sim = WindStress.WindStress(t=wind_t, wind_u=np.float32(wind_u), wind_v=np.float32(wind_v))
 
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx, \
-                        self.eta0, self.hu0, self.hv0, self.Hi, \
-                        self.nx, self.ny, \
-                        self.dx, self.dy, self.dt, \
-                        self.g, self.f, self.r, \
-                        boundary_conditions=self.boundary_conditions,
+        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+                                   self.eta0, self.hu0, self.hv0, self.Hi,
+                                   self.nx, self.ny,
+                                   self.dx, self.dy, self.dt,
+                                   self.g, self.f, self.r,
+                                   boundary_conditions=self.boundary_conditions,
                         wind=wind4sim)
     
 
     def tearDown(self) -> None:
-        if self.sim != None:
+        if self.sim is not None:
             self.sim.cleanUp()
             self.sim = None
 
@@ -103,21 +105,21 @@ class WindForcingTest(unittest.TestCase):
 
         drifterSets = []
         for i in range(self.N_winds):
-            drifterSets.append( GPUDrifterCollection.GPUDrifterCollection( self.gpu_ctx_winds[i], 1, 
-                                                        wind = wind4drifters[i], wind_drift_factor=0.02,
-                                                        boundaryConditions = self.sim.boundary_conditions,
-                                                        domain_size_x =  self.sim.nx*self.sim.dx,
-                                                        domain_size_y =  self.sim.ny*self.sim.dy,
-                                                        gpu_stream = self.sim.gpu_stream) )
+            drifterSets.append( GPUDrifterCollection.GPUDrifterCollection(self.gpu_ctx_winds[i], 1,
+                                                                          wind = wind4drifters[i], wind_drift_factor=0.02,
+                                                                          boundary_conditions= self.sim.boundary_conditions,
+                                                                          domain_size_x =  self.sim.nx*self.sim.dx,
+                                                                          domain_size_y =  self.sim.ny*self.sim.dy,
+                                                                          gpu_stream = self.sim.gpu_stream) )
             drifterSets[i].setDrifterPositions([[int(0.5*self.ny*self.dy),int(0.5*self.ny*self.dy)]])
         
         for min in range(self.T):
             dt = 1
             self.sim.step(dt)
             for i in range(self.N_winds):
-                drifterSets[i].drift(self.sim.gpu_data.h0, self.sim.gpu_data.hu0, self.sim.gpu_data.hv0, \
-                                self.sim.bathymetry.Bm, self.sim.nx, self.sim.ny, self.sim.t, self.sim.dx, self.sim.dy, \
-                                dt, np.int32(2), np.int32(2))
+                drifterSets[i].drift(self.sim.gpu_data.h0, self.sim.gpu_data.hu0, self.sim.gpu_data.hv0,
+                                     self.sim.bathymetry.Bm, self.sim.nx, self.sim.ny, self.sim.t, self.sim.dx, self.sim.dy,
+                                     dt, np.int32(2), np.int32(2))
 
         drifter_positions = []
         for i in range(self.N_winds):

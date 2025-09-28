@@ -21,16 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import unittest
-import time
-import numpy as np
-import sys
-import gc
-import pycuda.driver as cuda
-
 from testUtils import *
 
-from gpuocean.utils import Common
 from gpuocean.SWEsimulators.OceanStateNoise import *
 from stochastic.OceanStateNoise_parent import OceanStateNoiseTestParent
 

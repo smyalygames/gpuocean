@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
-import numpy as np
-import sys
 import gc
 
 from testUtils import *
 
 from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import Common, WindStress, AtmosphericPressure
+from gpuocean.utils import WindStress, AtmosphericPressure
+from gpuocean.utils.gpu import KernelContext
+
 
 class RealisticForcingTest(unittest.TestCase):
     def setUp(self):
         self.sim_args = {
-            "gpu_ctx": Common.CUDAContext(),
+            "gpu_ctx": KernelContext(),
             "nx": 500, "ny": 400, "dx": 800, "dy": 500,
             "g": 9.81, "dt": 0.0, "f": 0.0, "r": 0.0,
             "rho_o": 1015, 

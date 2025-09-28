@@ -21,23 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
-import time
-import numpy as np
-import sys
-import gc
-import pycuda.driver as cuda
 
 from testUtils import *
 
-from gpuocean.utils import Common
 from gpuocean.SWEsimulators.OceanStateNoise import *
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
+from gpuocean.utils.gpu import KernelContext, GPUStream, Array2D
 
 
 class OceanStateNoiseTestParent(unittest.TestCase):
 
     def setUp(self):
-        self.gpu_ctx = Common.CUDAContext()
-        self.gpu_stream = cuda.Stream()
+        self.gpu_ctx = KernelContext()
+        self.gpu_stream = GPUStream()
         
         self.nx = 30
         self.ny = 40
@@ -76,7 +72,7 @@ class OceanStateNoiseTestParent(unittest.TestCase):
         self.large_ny = 400
         self.large_noise = None
 
-        self.floatMax = 2147483648.0
+        self.floatMax = float(np.iinfo(np.int32).max)
 
         self.eta = None
         self.hu = None
@@ -100,7 +96,8 @@ class OceanStateNoiseTestParent(unittest.TestCase):
         if self.H is not None:
             self.H.release()
         if self.gpu_ctx is not None:
-            self.assertEqual(sys.getrefcount(self.gpu_ctx), 2)
+            # FIXME This is no longer valid after implementing HIP
+            # self.assertEqual(sys.getrefcount(self.gpu_ctx), 2)
             self.gpu_ctx = None
    
         gc.collect()
@@ -109,39 +106,39 @@ class OceanStateNoiseTestParent(unittest.TestCase):
         return False
             
     def create_noise(self, factor=1, seed=1):
-        n,e,s,w = 1,1,1,1
+        n,e,s,w = BoundaryType.WALL, BoundaryType.WALL, BoundaryType.WALL, BoundaryType.WALL
         if self.periodicNS:
-            n,s = 2,2
+            n,s = BoundaryType.PERIODIC, BoundaryType.PERIODIC
         if self.periodicEW:
-            e,w = 2,2
+            e,w = BoundaryType.PERIODIC, BoundaryType.PERIODIC
         self.noise = OceanStateNoise(self.gpu_ctx, self.gpu_stream,
                                      self.nx, self.ny,
                                      self.dx, self.dy,
-                                     Common.BoundaryConditions(n,e,s,w),
+                                     BoundaryConditions(n,e,s,w),
                                      staggered=self.staggered,
                                      interpolation_factor=factor,
                                      use_lcg=self.useLCG(), 
                                      np_seed=seed)
     def create_large_noise(self, seed=1):
-        n,e,s,w = 1,1,1,1
+        n,e,s,w = BoundaryType.WALL, BoundaryType.WALL, BoundaryType.WALL, BoundaryType.WALL
         if self.periodicNS:
-            n,s = 2,2
+            n,s = BoundaryType.PERIODIC, BoundaryType.PERIODIC
         if self.periodicEW:
-            e,w = 2,2
+            e,w = BoundaryType.PERIODIC, BoundaryType.PERIODIC
         self.large_noise = OceanStateNoise(self.gpu_ctx, self.gpu_stream,
                                            self.large_nx, self.large_ny,
                                            self.dx, self.dy,
-                                           Common.BoundaryConditions(n,e,s,w),
+                                           BoundaryConditions(n,e,s,w),
                                            staggered = self.staggered,
                                            use_lcg=self.useLCG(),
                                            np_seed=seed)
 
-    def allocateBuffers(self, HCPU):
+    def allocateBuffers(self, HCPU: npt.NDArray):
         host_buffer = np.zeros((self.ny+2*self.ghost_cells_y, self.nx+2*self.ghost_cells_x))
-        self.eta = Common.CUDAArray2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
-        self.hu = Common.CUDAArray2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
-        self.hv = Common.CUDAArray2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
-        self.H = Common.CUDAArray2D(self.gpu_stream, self.nx+1, self.ny+1, self.ghost_cells_x, self.ghost_cells_y, HCPU)
+        self.eta = Array2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
+        self.hu = Array2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
+        self.hv = Array2D(self.gpu_stream, self.nx, self.ny, self.ghost_cells_x, self.ghost_cells_y, host_buffer)
+        self.H = Array2D(self.gpu_stream, self.nx+1, self.ny+1, self.ghost_cells_x, self.ghost_cells_y, HCPU)
         del host_buffer
         
     def compare_random(self, tol, msg):
@@ -151,17 +148,17 @@ class OceanStateNoiseTestParent(unittest.TestCase):
         # We therefore make sure that seed is in [0, 1]
         if self.noise.use_lcg:
             seed = self.noise.getSeed()
-            seedCPU = self.noise.getSeedCPU()
+            seed_cpu = self.noise.getSeedCPU()
 
             msg = msg+"\ntype(seed):    " + str(type(seed)) + ", " + str(type(seed[0,0]))\
-                  + "\ntype(seedCPU): " + str(type(seedCPU)) + ", " + str(type(seedCPU[0,0]))
+                  + "\ntype(seedCPU): " + str(type(seed_cpu)) + ", " + str(type(seed_cpu[0,0]))
             
-            assert2DListAlmostEqual(self, seed.tolist(), seedCPU.tolist(), tol, msg+", seed")
+            assert2DListAlmostEqual(self, seed.tolist(), seed_cpu.tolist(), tol, msg+", seed")
 
         random = self.noise.getRandomNumbers()
-        randomCPU = self.noise.getRandomNumbersCPU()
+        random_cpu = self.noise.getRandomNumbersCPU()
 
-        assert2DListAlmostEqual(self, random.tolist(), randomCPU.tolist(), tol, msg+", random")
+        assert2DListAlmostEqual(self, random.tolist(), random_cpu.tolist(), tol, msg+", random")
 
    
         

@@ -30,7 +30,7 @@ import abc
 
 from testUtils import *
 
-from gpuocean.utils import Common
+from gpuocean.utils.gpu import KernelContext
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 
 from gpuocean.ensembles import DrifterEnsemble
@@ -42,7 +42,7 @@ class DrifterEnsembleTest(BaseDrifterEnsembleTest):
     def setUp(self):
         super(DrifterEnsembleTest, self).setUp()
         
-        self.gpu_ctx = Common.CUDAContext()
+        self.gpu_ctx = KernelContext()
                 
     def tearDown(self):
         super(DrifterEnsembleTest, self).tearDown()

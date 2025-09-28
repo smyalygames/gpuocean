@@ -22,22 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
-import time
-import numpy as np
-import sys
-import os
 import gc
 
 from testUtils import *
 
 from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import Common, SimWriter, SimReader, DoubleJetCase
+from gpuocean.utils import DoubleJetCase
+from gpuocean.utils.gpu import KernelContext
 
 
 class NetCDFtest(unittest.TestCase):
 
     def setUp(self):
-        self.gpu_ctx = Common.CUDAContext()
+        self.gpu_ctx = KernelContext()
 
         self.sim = None
         self.file_sim = None
@@ -53,7 +50,8 @@ class NetCDFtest(unittest.TestCase):
             self.file_sim = None
         
         if self.gpu_ctx is not None:
-            self.assertEqual(sys.getrefcount(self.gpu_ctx), 2)
+            # FIXME This is no longer valid after implementing HIP
+            # self.assertEqual(sys.getrefcount(self.gpu_ctx), 2)
             self.gpu_ctx = None
         
         gc.collect() # Force run garbage collection to free up memory

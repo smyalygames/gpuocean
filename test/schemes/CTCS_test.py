@@ -21,22 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
-import time
-import numpy as np
-import sys
-import os
 import gc
 
 from testUtils import *
 
 from gpuocean.SWEsimulators import CTCS
-from gpuocean.utils import Common
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
+from gpuocean.utils.gpu import KernelContext
 
 
 class CTCStest(unittest.TestCase):
 
     def setUp(self):
-        self.gpu_ctx = Common.CUDAContext()
+        self.gpu_ctx = KernelContext()
 
         self.nx = 50
         self.ny = 70
@@ -50,10 +47,10 @@ class CTCStest(unittest.TestCase):
         self.r = 0.0
         self.A = 1
         
-        self.h0 = np.ones((self.ny+2, self.nx+2), dtype=np.float32) * 60;
-        self.eta0 = np.zeros((self.ny+2, self.nx+2), dtype=np.float32);
-        self.u0 = np.zeros((self.ny+2, self.nx+1+2), dtype=np.float32);
-        self.v0 = np.zeros((self.ny+1+2, self.nx+2), dtype=np.float32);
+        self.h0 = np.ones((self.ny+2, self.nx+2), dtype=np.float32) * 60
+        self.eta0 = np.zeros((self.ny+2, self.nx+2), dtype=np.float32)
+        self.u0 = np.zeros((self.ny+2, self.nx+1+2), dtype=np.float32)
+        self.v0 = np.zeros((self.ny+1+2, self.nx+2), dtype=np.float32)
 
         self.ghosts = [1,1,1,1] # north, east, south, west
         self.etaRange = [-1, -1, 1, 1]
@@ -86,13 +83,16 @@ class CTCStest(unittest.TestCase):
             
     def setBoundaryConditions(self, bcSettings=1):
         if (bcSettings == 1):
-            self.boundaryConditions = Common.BoundaryConditions()
+            self.boundaryConditions = BoundaryConditions()
         elif (bcSettings == 2):
-            self.boundaryConditions = Common.BoundaryConditions(2,2,2,2)
+            self.boundaryConditions = BoundaryConditions(BoundaryType.PERIODIC, BoundaryType.PERIODIC,
+                                                         BoundaryType.PERIODIC, BoundaryType.PERIODIC)
         elif bcSettings == 3:
-            self.boundaryConditions = Common.BoundaryConditions(2,1,2,1)
+            self.boundaryConditions = BoundaryConditions(BoundaryType.PERIODIC, BoundaryType.WALL,
+                                                         BoundaryType.PERIODIC, BoundaryType.WALL)
         else:
-            self.boundaryConditions = Common.BoundaryConditions(1,2,1,2)
+            self.boundaryConditions = BoundaryConditions(BoundaryType.WALL, BoundaryType.PERIODIC,
+                                                         BoundaryType.WALL, BoundaryType.PERIODIC)
 
 
         
@@ -133,10 +133,10 @@ class CTCStest(unittest.TestCase):
     def test_wall_central(self):
         self.setBoundaryConditions()
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -149,10 +149,10 @@ class CTCStest(unittest.TestCase):
     def test_wall_corner(self):
         self.setBoundaryConditions()
         makeCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
         
         t = self.sim.step(self.T)
@@ -164,10 +164,10 @@ class CTCStest(unittest.TestCase):
     def test_wall_upperCorner(self):
         self.setBoundaryConditions()
         makeUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
         
         t = self.sim.step(self.T)
@@ -182,10 +182,10 @@ class CTCStest(unittest.TestCase):
     def test_periodic_central(self):
         self.setBoundaryConditions(2)
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -199,10 +199,10 @@ class CTCStest(unittest.TestCase):
     def test_periodic_corner(self):
         self.setBoundaryConditions(2)
         makeCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -217,10 +217,10 @@ class CTCStest(unittest.TestCase):
     def test_periodic_upperCorner(self):
         self.setBoundaryConditions(2)
         makeUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -238,10 +238,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicNS_central(self):
         self.setBoundaryConditions(3)
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -253,10 +253,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicNS_corner(self):
         self.setBoundaryConditions(3)
         makeCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -271,10 +271,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicNS_upperCorner(self):
         self.setBoundaryConditions(3)
         makeUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -292,10 +292,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicEW_central(self):
         self.setBoundaryConditions(4)
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -307,10 +307,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicEW_corner(self):
         self.setBoundaryConditions(4)
         makeCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -325,10 +325,10 @@ class CTCStest(unittest.TestCase):
     def test_periodicEW_upperCorner(self):
         self.setBoundaryConditions(4)
         makeUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -345,10 +345,10 @@ class CTCStest(unittest.TestCase):
         self.setBoundaryConditions()
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
         self.f = 0.01
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -365,11 +365,11 @@ class CTCStest(unittest.TestCase):
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
         self.f = 0.01
         beta = 1e-6
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
-                             self.g, self.f, self.r, self.A, coriolis_beta=beta, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
+                             self.g, self.f, self.r, self.A, coriolis_beta=beta,
                              boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -388,10 +388,10 @@ class CTCStest(unittest.TestCase):
         makeBottomTopography(self.h0, self.nx, self.ny, self.dx, self.dy, self.ghosts, intersections=False)
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
         self.f = 0.01
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -409,10 +409,10 @@ class CTCStest(unittest.TestCase):
         self.setBoundaryConditions()
         makeBottomTopography(self.h0, self.nx, self.ny, self.dx, self.dy, self.ghosts, intersections=False)
         makeCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.ghosts)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
 
         t = self.sim.step(self.T)
@@ -429,10 +429,10 @@ class CTCStest(unittest.TestCase):
         self.eta0 = np.array(range(self.eta0.size)).reshape(self.eta0.shape)
         self.u0   = np.array(range(  self.u0.size)).reshape(  self.u0.shape)
         self.v0   = np.array(range(  self.v0.size)).reshape(  self.v0.shape)
-        self.sim = CTCS.CTCS(self.gpu_ctx, \
-                             self.h0, self.eta0, self.u0, self.v0, \
-                             self.nx, self.ny, \
-                             self.dx, self.dy, self.dt, \
+        self.sim = CTCS.CTCS(self.gpu_ctx,
+                             self.h0, self.eta0, self.u0, self.v0,
+                             self.nx, self.ny,
+                             self.dx, self.dy, self.dt,
                              self.g, self.f, self.r, self.A, boundary_conditions=self.boundaryConditions)
         self.sim._call_all_boundary_conditions()
         
