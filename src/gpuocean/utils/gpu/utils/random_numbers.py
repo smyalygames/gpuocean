@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import gc
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from gpuocean.utils.gpu import Array2D, GPUStream
 
 
-class BaseRandomNumbers(object):
+class BaseRandomNumbers(ABC):
     """
     A class for generating XORWOW for pycuda and HIP.
     """
@@ -42,8 +42,21 @@ class BaseRandomNumbers(object):
         if xorwow_seed is None:
             self._xorwow_seed = seed
 
+    @abstractmethod
     def fill_normal(self, array: Array2D, gpu_stream: GPUStream = None):
-        raise NotImplementedError("Function needs to be implemented in a subclass.")
+        """
+        Fills an array with random numbers using a standard normal distribution.
+        Args:
+            array: 2D device array to fill with random numbers.
+            gpu_stream: (Optional) The stream for the GPU.
+        """
 
+
+    @abstractmethod
     def fill_uniform(self, array: Array2D, gpu_stream: GPUStream = None):
-        raise NotImplementedError("Function needs to be implemented in a subclass.")
+        """
+        Fills an array with random numbers using a uniform distribution.
+        Args:
+            array: 2D device array to fill with random numbers
+            gpu_stream: (Optional) The stream for the GPU.
+        """

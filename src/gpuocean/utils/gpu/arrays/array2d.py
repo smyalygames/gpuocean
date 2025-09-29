@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TypeVar, Generic, Union, TYPE_CHECKING
+from abc import ABC, abstractmethod
 
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +14,7 @@ T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]
 
 
-class BaseArray2D(Generic[T]):
+class BaseArray2D(ABC, Generic[T]):
     """
     A base class that holds 2D data. To be used depending on the GPGPU language.
     """
@@ -65,37 +66,37 @@ class BaseArray2D(Generic[T]):
             self.release()
 
     @property
+    @abstractmethod
     def pointer(self):
         """
         Gets the pointer for the array on the GPU, that is being managed by this object.
         Returns:
             A pointer for the array on the GPU
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def upload(self, gpu_stream: GPUStream, data: data_t) -> None:
         """
         Filling the allocated buffer with new data.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def copy_buffer(self, gpu_stream: GPUStream, buffer: Array2D) -> None:
         """
         Copying the given device buffer into the already allocated memory
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def download(self, gpu_stream: GPUStream) -> data_t:
         """
         Enables downloading data from CUDA device to Python
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def release(self) -> None:
         """
         Frees the allocated memory buffers on the GPU
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
     def _convert_to_precision(self, data: data_t) -> data_t:
         """

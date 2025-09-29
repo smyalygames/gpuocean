@@ -1,13 +1,17 @@
-class BaseEvent(object):
+from abc import ABC, abstractmethod
+
+class BaseEvent(ABC):
     """
     A GPU Event handler.
     """
 
+    @abstractmethod
     def __init__(self):
         """
         Creates a GPU Event.
         """
 
+    @abstractmethod
     def record(self, stream):
         """
         Insert a recording point into the ``stream``.
@@ -15,14 +19,14 @@ class BaseEvent(object):
         Args:
             stream: The stream to insert the recording point into.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def synchronize(self):
         """
         Wait for the event to complete.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def time_since(self, start) -> float:
         """
         Return the elapsed time from the ``start`` event and this class.
@@ -33,4 +37,3 @@ class BaseEvent(object):
         Returns:
             Time since the ``start`` event and the end time of this class.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")

@@ -1,9 +1,10 @@
+from typing import TYPE_CHECKING
+from abc import ABC, abstractmethod
 import os
 import io
 import logging
 from hashlib import md5
 from enum import Enum, auto
-from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
 from gpuocean.utils.utils import get_project_root, get_includes
@@ -27,7 +28,7 @@ class DeviceInfo:
     driver_version: str
 
 
-class Context(object):
+class Context(ABC):
     """
     Class that manages either a HIP or CUDA context.
     """
@@ -55,17 +56,17 @@ class Context(object):
                 os.makedirs(self.cache_path)
             self.logger.info(f"Using cache dir {self.cache_path}")
 
+    @abstractmethod
     def __del__(self):
         """
         Cleans up the context.
         """
-        pass
 
+    @abstractmethod
     def __str__(self):
         """
         Gives the context ID.
         """
-        pass
 
     @staticmethod
     def hash_kernel(kernel_filename: str, include_dirs: list[str]) -> str:
@@ -126,6 +127,7 @@ class Context(object):
 
         return kernel_hasher.hexdigest()
 
+    @abstractmethod
     def get_kernel(self, kernel_filename: str,
                    include_dirs: dict = None,
                    defines: dict[str, dict] = None,
@@ -134,10 +136,9 @@ class Context(object):
         """
         Reads a text file and creates a kernel from that.
         """
-        raise NotImplementedError("Needs to be implemented in subclass")
 
+    @abstractmethod
     def synchronize(self) -> None:
         """
         Synchronizes all the streams, etc.
         """
-        raise NotImplementedError("Needs to be implemented in subclass")

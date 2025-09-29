@@ -1,15 +1,17 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
     from .. import GPUStream
 
 
-class BaseGPUHandler(object):
+class BaseGPUHandler(ABC):
     """
     A handler to make GPU calls.
     """
 
+    @abstractmethod
     def __init__(self, module, function: str, arguments: str):
         """
         Create a new GPU handler.
@@ -20,6 +22,7 @@ class BaseGPUHandler(object):
             arguments: A string of the argument types to parse to the kernel.
         """
 
+    @abstractmethod
     def async_call(self, grid_size, block_size: tuple[int, int, int], stream: GPUStream, args: list):
         """
         Makes an asynchronous call to the kernel on the GPU with the function that was used to initialize this object.
@@ -30,8 +33,8 @@ class BaseGPUHandler(object):
             stream: The GPU data stream.
             args: Parameters to be passed into the GPU kernel.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")
 
+    @abstractmethod
     def call(self, grid_size, block_size: tuple[int, int, int], args: list):
         """
         Makes a call to the kernel on the GPU with the function that was used to initialize this object.
@@ -41,4 +44,3 @@ class BaseGPUHandler(object):
             block_size: The block size, as a tuple.
             args: Parameters to be passed into the GPU kernel.
         """
-        raise NotImplementedError("This function needs to be implemented in a subclass.")

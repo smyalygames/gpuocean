@@ -1,11 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
     from .. import stream_t
 
 
-class Stream:
+class Stream(ABC):
     """
     A base class to handle streams for each GPU platform.
     """
@@ -22,14 +23,14 @@ class Stream:
         """
         return self._stream
 
-    def synchronize(self):
+    @abstractmethod
+    def synchronize(self) -> None:
         """
         Synchronize the GPU Stream
         """
-        raise NotImplementedError("Needs to be implemented in a separate subclass.")
 
-    def destroy(self):
+    @abstractmethod
+    def destroy(self) -> None:
         """
         Destroy the GPU Stream.
         """
-        raise NotImplementedError("Needs to be implemented in a separate subclass.")
