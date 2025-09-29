@@ -33,7 +33,7 @@ import logging
 
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import interp2d, RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline
 
 from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure
 from gpuocean.utils.Common import BoundaryConditions, BoundaryConditionsData
@@ -136,13 +136,13 @@ class CDKLM16(Simulator.Simulator):
 
         self.logger = logging.getLogger(__name__)
 
-        assert (rk_order < 4 or rk_order > 0), "Only 1st, 2nd and 3rd order Runge Kutta supported"
-
-        if rk_order == 3:
-            assert (r == 0.0), "3rd order Runge Kutta supported only without friction"
-        if use_direct_lookup:
-            assert (atmospheric_pressure.P[0].shape[0] == ny + 4 and atmospheric_pressure.P[0].shape[
-                1] == nx + 4), "Direct lookup is only supported for same sized grids"
+        if 4 <= rk_order <= 0:
+            raise TypeError("Only 1st, 2nd and 3rd order Runge Kutta supported")
+        if rk_order == 3 and r != 0.0:
+            raise ValueError("3rd order Runge Kutta supported only without friction")
+        if use_direct_lookup and (
+                atmospheric_pressure.P[0].shape[0] != ny + 4 or atmospheric_pressure.P[0].shape[1] != nx + 4):
+            raise TypeError("Direct lookup is only supported for same sized grids")
 
         # Sort out internally represented ghost_cells in the presence of given
         # boundary conditions
@@ -159,7 +159,7 @@ class CDKLM16(Simulator.Simulator):
         # Compensate f for reference cell (first cell in internal of domain)
         north = np.array([np.sin(angle[0, 0]), np.cos(angle[0, 0])])
         f = f - coriolis_beta * (
-                    x_zero_reference_cell * dx * float(north[0]) + y_zero_reference_cell * dy * float(north[1]))
+                x_zero_reference_cell * dx * float(north[0]) + y_zero_reference_cell * dy * float(north[1]))
 
         x_zero_reference_cell = 0
         y_zero_reference_cell = 0
