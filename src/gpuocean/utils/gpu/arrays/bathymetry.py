@@ -11,6 +11,7 @@ from .. import GPUHandler, Array2D
 if TYPE_CHECKING:
     from .. import KernelContext, GPUStream
 
+
 class Bathymetry:
     """
     Class for holding bathymetry defined on cell intersections (cell corners) and reconstructed on
@@ -19,7 +20,7 @@ class Bathymetry:
 
     def __init__(self, gpu_ctx: KernelContext, gpu_stream: GPUStream,
                  nx: int, ny: int, halo_x: int, halo_y: int,
-                 Bi_host: Union[npt.NDArray, np.ma.MaskedArray],
+                 bi_host: Union[npt.NDArray, np.ma.MaskedArray],
                  boundary_conditions=BoundaryConditions(),
                  block_width=16, block_height=16):
         # Convert scalar data to int32
@@ -35,18 +36,19 @@ class Bathymetry:
         # Set land value (if masked array)
         self.mask_value = 1.0e20
         self.use_mask = False
-        if np.ma.is_masked(Bi_host):
-            Bi_host = Bi_host.copy().filled(self.mask_value).astype(np.float32)
+        if np.ma.is_masked(bi_host):
+            bi_host = bi_host.copy().filled(self.mask_value).astype(np.float32)
             self.use_mask = True
 
         # Check that Bi has the size corresponding to number of cell intersections
-        BiShapeY, BiShapeX = Bi_host.shape
-        assert (BiShapeX == nx + 1 + 2 * halo_x and BiShapeY == ny + 1 + 2 * halo_y), \
-            "Wrong size of bottom bathymetry, should be defined on cell intersections, not cell centers. " + \
-            str((BiShapeX, BiShapeY)) + " vs " + str((nx + 1 + 2 * halo_x, ny + 1 + 2 * halo_y))
+        bi_shape_y, bi_shape_x = bi_host.shape
+        if bi_shape_x != nx + 1 + 2 * halo_x or bi_shape_y != ny + 1 + 2 * halo_y:
+            raise ValueError(
+                f"Wrong size of bottom bathymetry, should be defined on cell intersections, not cell centers.\n"
+                f"{(bi_shape_x, bi_shape_y)} vs {(nx + 1 + 2 * halo_x, ny + 1 + 2 * halo_y)}")
 
         # Upload Bi to device
-        self.Bi = Array2D(gpu_stream, nx + 1, ny + 1, halo_x, halo_y, Bi_host)
+        self.Bi = Array2D(gpu_stream, nx + 1, ny + 1, halo_x, halo_y, bi_host)
 
         # Define OpenCL parameters
         self.local_size = (block_width, block_height, 1)
@@ -119,8 +121,8 @@ class Bathymetry:
     # Transforming water elevation into water depth
     def waterElevationToDepth(self, h: Array2D) -> None:
 
-        assert ((h.ny_halo, h.nx_halo) == (self.halo_ny, self.halo_nx)), \
-            "h0 not the correct shape: " + str(h.shape) + ", but should be " + str((self.halo_ny, self.halo_nx))
+        if (h.ny_halo, h.nx_halo) != (self.halo_ny, self.halo_nx):
+            raise ValueError(f"h0 not the correct shape: {h.shape}, but should be {(self.halo_ny, self.halo_nx)}")
 
         # Call kernel
         self.waterElevationToDepth.async_call(self.global_size, self.local_size, self.gpu_stream,
@@ -131,10 +133,10 @@ class Bathymetry:
     # Transforming water depth into water elevation
     def waterDepthToElevation(self, w: Array2D, h: Array2D) -> None:
 
-        assert ((h.ny_halo, h.nx_halo) == (self.halo_ny, self.halo_nx)), \
-            "h0 not the correct shape: " + str(h.shape) + ", but should be " + str((self.halo_ny, self.halo_nx))
-        assert ((w.ny_halo, w.nx_halo) == (self.halo_ny, self.halo_nx)), \
-            "w not the correct shape: " + str(w.shape) + ", but should be " + str((self.halo_ny, self.halo_nx))
+        if (h.ny_halo, h.nx_halo) != (self.halo_ny, self.halo_nx):
+            raise ValueError(f"h0 not the correct shape: {h.shape}, but should be {(self.halo_ny, self.halo_nx)}")
+        if (w.ny_halo, w.nx_halo) != (self.halo_ny, self.halo_nx):
+            raise ValueError(f"w not the correct shape: {w.shape}, but should be {(self.halo_ny, self.halo_nx)}")
         # Call kernel
         self.waterDepthToElevation.async_call(self.global_size, self.local_size, self.gpu_stream,
                                               [self.halo_nx, self.halo_ny,
@@ -148,13 +150,17 @@ class Bathymetry:
                  self.Bi.pointer, self.Bi.pitch])
 
         # North-south:
-        if (self.boundary_conditions.north == BoundaryType.PERIODIC) and (self.boundary_conditions.south == BoundaryType.PERIODIC):
+        if (self.boundary_conditions.north == BoundaryType.PERIODIC) and (
+                self.boundary_conditions.south == BoundaryType.PERIODIC):
             self.periodic_boundary_intersections_NS.async_call(*args)
-        elif (self.boundary_conditions.north == BoundaryType.WALL) and (self.boundary_conditions.south == BoundaryType.WALL):
+        elif (self.boundary_conditions.north == BoundaryType.WALL) and (
+                self.boundary_conditions.south == BoundaryType.WALL):
             self.closed_boundary_intersections_NS.async_call(*args)
 
         # East-west:
-        if (self.boundary_conditions.east == BoundaryType.PERIODIC) and (self.boundary_conditions.west == BoundaryType.PERIODIC):
+        if (self.boundary_conditions.east == BoundaryType.PERIODIC) and (
+                self.boundary_conditions.west == BoundaryType.PERIODIC):
             self.periodic_boundary_intersections_EW.async_call(*args)
-        elif (self.boundary_conditions.north == BoundaryType.WALL) and (self.boundary_conditions.south == BoundaryType.WALL):
+        elif (self.boundary_conditions.north == BoundaryType.WALL) and (
+                self.boundary_conditions.south == BoundaryType.WALL):  # TODO check this is supposed to be checking north/south boundary types
             self.closed_boundary_intersections_EW.async_call(*args)
