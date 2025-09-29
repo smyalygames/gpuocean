@@ -37,12 +37,13 @@ class CudaContext(Context):
     Class which keeps track of the CUDA context and some helper functions
     """
 
-    def __init__(self, device=0, context_flags=None, use_cache=True):
+    def __init__(self, device=0, blocking=False, context_flags=None, use_cache=True):
         """
         Create a new CUDA context
 
         Args:
             device: To use a specific GPU, provide either an ``id`` or ``pci_bus_id`` for the GPU.
+            blocking: Allows for the context to be blocked
             context_flags: To set a blocking context, provide ``cuda.ctx_flags.SCHED_BLOCKING_SYNC``.
             use_cache: Caches the kernels after they are compiled.
         """
@@ -77,7 +78,8 @@ class CudaContext(Context):
         # Create the CUDA context
         if context_flags is None:
             context_flags = cuda.ctx_flags.SCHED_AUTO
-
+        elif blocking:
+            context_flags = cuda.ctx_flags.SCHED_BLOCKING_SYNC
         self.cuda_context = self.cuda_device.make_context(flags=context_flags)
 
         self.logger.info(f"Created context handle <{str(self.cuda_context.handle)}>")

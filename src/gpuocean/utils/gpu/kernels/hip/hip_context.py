@@ -15,12 +15,13 @@ class HIPContext(Context):
     Class that manages the HIP context.
     """
 
-    def __init__(self, device=None, context_flags=None, use_cache=True):
+    def __init__(self, device=None, blocking=False, context_flags=None, use_cache=True):
         """
         Creates a new HIP context.
 
         Args:
             device: Device ID of the GPU to use.
+            blocking: Allows for the context to be blocked
             context_flags: Does nothing.
             use_cache: Uses previously compiled kernel cache.
         """

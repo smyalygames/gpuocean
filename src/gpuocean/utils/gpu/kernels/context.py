@@ -39,10 +39,11 @@ class Context(ABC):
         def __str__(self):
             return f'{self.name.lower()}'
 
-    def __init__(self, language: Architecture, device=0, context_flags=None, use_cache=True):
+    def __init__(self, language: Architecture, device=0, blocking=False, context_flags=None, use_cache=True):
         """
         Create a new context.
         """
+        self.blocking = blocking
         self.use_cache = use_cache
         self.logger = logging.getLogger(__name__)
         self.modules: dict[str, module_t] = {}
