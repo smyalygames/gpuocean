@@ -141,5 +141,5 @@ class HIPArray3D(BaseArray3D):
 
     def release(self):
         if self.holds_data:
-            hip_check(hip.hipFree(self.data))
+            hip_check(hip.hipFree(self.data.ptr))
             self.holds_data = False
