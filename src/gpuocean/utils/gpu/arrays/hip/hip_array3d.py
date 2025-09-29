@@ -39,7 +39,7 @@ class HIPArray3D(BaseArray3D):
         copy_params = hip.HIP_MEMCPY3D(srcHost=self._host_data, srcPitch=self._host_data.strides[0],
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
 
-                                       dstDevice=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
@@ -78,7 +78,7 @@ class HIPArray3D(BaseArray3D):
         copy_params = hip.HIP_MEMCPY3D(srcHost=data, srcPitch=data.strides[0],
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
 
-                                       dstDevice=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
@@ -97,10 +97,10 @@ class HIPArray3D(BaseArray3D):
         self._check(buffer.shape[::-1], buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
-        copy_params = hip.HIP_MEMCPY3D(srcDevice=buffer.data.ptr, srcPitch=buffer.data.pitch,
+        copy_params = hip.HIP_MEMCPY3D(srcDevice=buffer.pointer, srcPitch=buffer.data.pitch,
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
-                                       dstHost=self.data.ptr, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
@@ -125,7 +125,7 @@ class HIPArray3D(BaseArray3D):
         data_h = np.zeros(self.shape, dtype=self.dtype)
 
         # Parameters to copy from GPU memory
-        copy_params = hip.HIP_MEMCPY3D(srcDevice=self.data.ptr, srcPitch=self.data.pitch,
+        copy_params = hip.HIP_MEMCPY3D(srcDevice=self.pointer, srcPitch=self.data.pitch,
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        dstHost=data_h, dstPitch=data_h.strides[0],
@@ -141,5 +141,5 @@ class HIPArray3D(BaseArray3D):
 
     def release(self):
         if self.holds_data:
-            hip_check(hip.hipFree(self.data.ptr))
+            hip_check(hip.hipFree(self.pointer))
             self.holds_data = False

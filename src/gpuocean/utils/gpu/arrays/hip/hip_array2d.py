@@ -36,7 +36,7 @@ class HIPArray2D(BaseArray2D):
         malloc: tuple[Pointer, int] = hip_check(hip.hipMallocPitch(self.width, self.height))
         self.data, self.pitch = malloc
 
-        hip_check(hip.hipMemcpy2DAsync(dst=self.data, dpitch=self.pitch,
+        hip_check(hip.hipMemcpy2DAsync(dst=self.pointer, dpitch=self.pitch,
                                        src=self._host_data, spitch=self._host_data.strides[0],
                                        width=self.width, height=self.height,
                                        kind=hip.hipMemcpyKind.hipMemcpyHostToDevice, stream=gpu_stream.pointer))
@@ -62,7 +62,7 @@ class HIPArray2D(BaseArray2D):
 
         # Parameters to copy to GPU memory
         src = Host(data)
-        dst = Device(self.data, self.pitch, self.dtype)
+        dst = Device(self.pointer, self.pitch, self.dtype)
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
@@ -78,8 +78,8 @@ class HIPArray2D(BaseArray2D):
         self._check(buffer.shape, buffer.bytes_per_float)
 
         # Okay, everything is fine - issue device-to-device-copy:
-        src = Device(buffer.data, buffer.pitch, buffer.dtype)
-        dst = Device(self.data, self.pitch, self.dtype)
+        src = Device(buffer.pointer, buffer.pitch, buffer.dtype)
+        dst = Device(self.pointer, self.pitch, self.dtype)
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
 
@@ -101,7 +101,7 @@ class HIPArray2D(BaseArray2D):
         data = np.zeros(self.shape, dtype=self.dtype)
 
         # Parameters to copy from GPU memory
-        src = Device(self.data, self.pitch, self.dtype)
+        src = Device(self.pointer, self.pitch, self.dtype)
         dst = Host(data)
         transfer = Transfer(src, dst, self.width, self.height)
         copy = transfer.get_transfer()
