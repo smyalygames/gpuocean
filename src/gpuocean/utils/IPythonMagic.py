@@ -24,10 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 import gc
 
-import argparse
 from IPython.core import magic_arguments
 from IPython.core.magic import line_magic, Magics, magics_class
-import pycuda.driver as cuda
 
 from gpuocean.utils import Common
 from gpuocean.utils.gpu import KernelContext
