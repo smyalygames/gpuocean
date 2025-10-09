@@ -39,7 +39,7 @@ class HIPArray3D(BaseArray3D):
         copy_params = hip.HIP_MEMCPY3D(srcHost=self._host_data, srcPitch=self._host_data.strides[0],
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
 
-                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
@@ -78,7 +78,7 @@ class HIPArray3D(BaseArray3D):
         copy_params = hip.HIP_MEMCPY3D(srcHost=data, srcPitch=data.strides[0],
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeHost,
 
-                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
@@ -100,7 +100,7 @@ class HIPArray3D(BaseArray3D):
         copy_params = hip.HIP_MEMCPY3D(srcDevice=buffer.pointer, srcPitch=buffer.data.pitch,
                                        srcMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
-                                       dstDevice=self.pointer, dstPitch=self.data.pitch,
+                                       dstDevice=self.pointer, dstPitch=self.pitch,
                                        dstMemoryType=hip.hipMemoryType.hipMemoryTypeDevice,
 
                                        WidthInBytes=self.bytes_per_float * self.extent.width,
