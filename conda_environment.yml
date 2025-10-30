@@ -6,9 +6,9 @@ channels:
 
 # If you update this list, please also update gpu_ocean/requirements.txt
 dependencies:
-- python=3.10
+- python
 - conda-build
-- ipykernel
+- jupyterlab
 - numpy
 - matplotlib
 - netcdf4
@@ -29,7 +29,6 @@ dependencies:
 - gitpython
 - scikit-image
 - pip:
-    - pycuda
     - hip-python==6.4.1.552.39
     - --extra-index-url https://test.pypi.org/simple/
 # Activate environment and install the following packages using pip:
