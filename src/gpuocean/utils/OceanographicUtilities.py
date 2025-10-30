@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
+import numpy.typing as npt
 from scipy import interpolate 
 
 
@@ -202,7 +203,7 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
 
     
     
-def calcCoriolisParams(lat):
+def calcCoriolisParams(lat: float) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     #https://en.wikipedia.org/wiki/Coriolis_frequency
     #https://en.wikipedia.org/wiki/Beta_plane
     #Earths rotation rate: 7.2921 × 10−5 rad/s
@@ -216,7 +217,7 @@ def calcCoriolisParams(lat):
     a = 6371008.8
     beta = 2.0*omega*np.cos(lat) / a
     
-    return [f, beta]
+    return f, beta
 
 def degToRad(deg):
     return deg*np.pi/180
