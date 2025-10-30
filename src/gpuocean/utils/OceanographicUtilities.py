@@ -116,10 +116,10 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
         
         # First count number of valid cells 
         # for each intersection
-        count = 4 - (int(mask[1:, 1:])
-                + int(mask[:-1, 1:])
-                + int(mask[:-1, :-1])
-                + int(mask[1:, :-1]))
+        count = 4 - (mask[1:, 1:].astype('int')
+                + mask[:-1, 1:].astype('int')
+                + mask[:-1, :-1].astype('int')
+                + mask[1:, :-1].astype('int'))
 
         # Then set the average
         values = midpoints.data[1:, 1:] + midpoints.data[:-1, 1:] + midpoints.data[:-1, :-1] + midpoints.data[1:, :-1]
@@ -157,10 +157,10 @@ def midpointsToIntersections(a_m, iterations=20, tolerance=5e-3, use_minmod=Fals
             delta = np.ma.array(delta, mask=np.zeros(a_m.shape, dtype=np.bool))
         
         if i % 2 == 0:
-            count = 4 - (int(delta.mask[1:, 1:])
-                         + int(delta.mask[:-1, 1:])
-                         + int(delta.mask[:-1, :-1])
-                         + int(delta.mask[1:, :-1]))
+            count = 4 - (delta.mask[1:, 1:].astype('int')
+                         + delta.mask[:-1, 1:].astype('int')
+                         + delta.mask[:-1, :-1].astype('int')
+                         + delta.mask[1:, :-1].astype('int'))
             delta_sum = (delta[:-1, :-1] + delta[:-1, 1:] + delta[1:, 1:] + delta[1:, :-1])
             delta_i = np.zeros(a_i.shape)
             delta_i[count>2] = delta_sum[count>2] / count[count>2]
