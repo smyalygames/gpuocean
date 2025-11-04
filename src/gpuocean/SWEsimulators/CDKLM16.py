@@ -158,7 +158,7 @@ class CDKLM16(Simulator.Simulator):
         # Compensate f for reference cell (first cell in internal of domain)
         north = np.array([np.sin(angle[0, 0]), np.cos(angle[0, 0])])
         f = f - coriolis_beta * (
-                x_zero_reference_cell * dx * float(north[0]) + y_zero_reference_cell * dy * float(north[1]))
+                x_zero_reference_cell * dx * north[0] + y_zero_reference_cell * dy * north[1])
 
         x_zero_reference_cell = 0
         y_zero_reference_cell = 0
@@ -239,7 +239,7 @@ class CDKLM16(Simulator.Simulator):
         # Initialize coriolis force GPU array
         self.coriolis_f_arr = Array2D(self.gpu_stream,
                                       coriolis_f.shape[1], coriolis_f.shape[0], 0, 0,
-                                      coriolis_f)
+                                      coriolis_f, padded=False)
 
         # Subsample angle
         if subsample_angle and angle.size >= eta0.size:
@@ -841,7 +841,7 @@ class CDKLM16(Simulator.Simulator):
 
         self.dt = courant_number * float(dt_host)
 
-    def _getMaxTimestepHost(self, courant_number=0.8):
+    def _getMaxTimestepHost(self, courant_number=0.8) -> float:
         """
         Calculates the maximum allowed time step according to the CFL conditions and scales the
         result with the provided courant number (0.8 on default).
