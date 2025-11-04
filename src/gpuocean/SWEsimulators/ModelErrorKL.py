@@ -93,21 +93,21 @@ class ModelErrorKL(object):
         self.gpu_ctx = gpu_ctx
         self.gpu_stream = gpu_stream
 
-        self.nx = int(nx)
-        self.ny = int(ny)
-        self.dx = float(dx)
-        self.dy = float(dy)
+        self.nx = nx
+        self.ny = ny
+        self.dx = dx
+        self.dy = dy
         self.boundary_conditions = boundary_conditions
 
         # KL parameters
-        self.kl_decay = float(kl_decay)
-        self.kl_scaling = float(kl_scaling)
-        self.include_cos = int(include_cos)
-        self.include_sin = int(include_sin)
-        self.basis_x_start = int(basis_x_start)
-        self.basis_y_start = int(basis_y_start)
-        self.basis_x_end = int(basis_x_end)
-        self.basis_y_end = int(basis_y_end)
+        self.kl_decay = kl_decay
+        self.kl_scaling = kl_scaling
+        self.include_cos = include_cos
+        self.include_sin = include_sin
+        self.basis_x_start = basis_x_start
+        self.basis_y_start = basis_y_start
+        self.basis_x_end = basis_x_end
+        self.basis_y_end = basis_y_end
 
         self.np_rng = np.random.default_rng(seed=np_seed)
         self.roll_x_sin = 0.0
