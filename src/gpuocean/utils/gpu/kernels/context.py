@@ -51,7 +51,7 @@ class Context(ABC):
         self.module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), f"gpu_kernels/{language}")
 
         # Creates cache directory if specified
-        self.cache_path = os.path.join(get_project_root(), ".gpuocean_cache", str(language))
+        self.cache_path = os.path.join(get_project_root(), "../.gpuocean_cache", str(language))
         if self.use_cache:
             if not os.path.isdir(self.cache_path):
                 os.makedirs(self.cache_path)
