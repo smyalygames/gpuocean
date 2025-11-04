@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from gpuocean.utils import Common, SimWriter
+from gpuocean.utils import Common
 from gpuocean.utils.gpu import GPUStream, Array2D
 
 try:
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from mpi4py import MPI
 
     from gpuocean.utils import WindStress, AtmosphericPressure
-    from gpuocean.utils.gpu import KernelContext, Array2D
+    from gpuocean.utils.gpu import KernelContext
 
 reload(Common)
 
@@ -349,7 +349,8 @@ class Simulator(object):
         """
         Attach drifters that are affected by this sim (self), but also others from sim_list.
         """
-        assert len(drifter_list) == len(sim_list), "Same number of drifter objects and partner simulations needed!"
+        if len(drifter_list) != len(sim_list):
+            raise ValueError("Same number of drifter objects and partner simulations needed!")
         self.hasCrossProductDrifter = True
         self.CrossProductDrifter = drifter_list
         for d in self.CrossProductDrifter:
