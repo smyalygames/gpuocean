@@ -18,7 +18,7 @@ class CudaArray2D(BaseArray2D):
     """
 
     def __init__(self, gpu_stream: CudaStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False, integers=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False, padded=True):
         """
         Uploads initial data to the CUDA device
         """

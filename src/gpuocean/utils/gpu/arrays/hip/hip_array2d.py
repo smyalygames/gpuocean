@@ -20,7 +20,7 @@ class HIPArray2D(BaseArray2D):
     """
 
     def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False, integers=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False, padded=True):
         """
         Uploads initial data to the HIP device
         """
@@ -33,8 +33,13 @@ class HIPArray2D(BaseArray2D):
 
         self.num_bytes = self.width * self.height
 
-        malloc: tuple[Pointer, int] = hip_check(hip.hipMallocPitch(self.width, self.height))
-        self.data, self.pitch = malloc
+        # Checks if a padded 2D array is wanted or not
+        if padded:
+            malloc: tuple[Pointer, int] = hip_check(hip.hipMallocPitch(self.width, self.height))
+            self.data, self.pitch = malloc
+        else:
+            self.pitch = self.width
+            self.data = hip_check(hip.hipMalloc(self.num_bytes))
 
         hip_check(hip.hipMemcpy2DAsync(dst=self.pointer, dpitch=self.pitch,
                                        src=self._host_data, spitch=self._host_data.strides[0],

@@ -20,7 +20,7 @@ class BaseArray2D(ABC, Generic[T]):
     """
 
     def __init__(self, gpu_stream: GPUStream, nx: int, ny: int, halo_x: int, halo_y: int, data: data_t,
-                 asym_halo: list[int] = None, double_precision=False, integers=False):
+                 asym_halo: list[int] = None, double_precision=False, integers=False, padded=True):
         """
         Uploads initial data to the CUDA device
         """
