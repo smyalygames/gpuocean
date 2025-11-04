@@ -35,11 +35,10 @@ import numpy as np
 import numpy.typing as npt
 from scipy.interpolate import RectBivariateSpline
 
-from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure
+from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure, OceanographicUtilities
 from gpuocean.utils.Common import BoundaryConditions, BoundaryConditionsData
 from gpuocean.utils.gpu.arrays.bathymetry import Bathymetry
 from gpuocean.SWEsimulators import Simulator, OceanStateNoise, ModelErrorKL
-from gpuocean.utils import OceanographicUtilities
 from gpuocean.utils.gpu import Array2D, GPUHandler, SWEDataArakawaA, BoundaryConditionsArakawaA
 
 if TYPE_CHECKING:
@@ -55,9 +54,9 @@ class CDKLM16(Simulator.Simulator):
 
     def __init__(self,
                  gpu_ctx: KernelContext,
-                 eta0: npt.NDArray[np.float32],
-                 hu0: npt.NDArray[np.float32], hv0: npt.NDArray[np.float32],
-                 H: npt.NDArray[np.float32],
+                 eta0: npt.NDArray[np.float32 | np.float64],
+                 hu0: npt.NDArray[np.float32 | np.float64], hv0: npt.NDArray[np.float32 | np.float64],
+                 H: npt.NDArray[np.float32 | np.float64],
                  nx: int, ny: int,
                  dx: float, dy: float, dt: float,
                  g: float, f: float, r: float,
@@ -220,7 +219,7 @@ class CDKLM16(Simulator.Simulator):
                                 self.nx + 2 * self.ghost_cells_x)
                 y = np.linspace((-self.ghost_cells_y + 0.5) * self.dy, (self.ny + self.ghost_cells_y - 0.5) * self.dy,
                                 self.ny + 2 * self.ghost_cells_x)
-                self.logger.info("Using latitude to create Coriolis f texture ({:f}x{:f} cells)".format(x.size, y.size))
+                self.logger.info(f"Using latitude to create Coriolis f texture ({x.size}x{y.size} cells)")
                 x, y = np.meshgrid(x, y)
                 n = x * np.sin(angle[0, 0]) + y * np.cos(angle[0, 0])  # North vector
                 coriolis_f = self.f + self.coriolis_beta * n
@@ -258,32 +257,32 @@ class CDKLM16(Simulator.Simulator):
                    'KPSIMULATOR_FLUX_SLOPE_EPS': "{:.12f}f".format(flux_slope_eps),
                    'KPSIMULATOR_DEPTH_CUTOFF': "{:.12f}f".format(depth_cutoff),
                    'THETA': "{:.12f}f".format(self.theta),
-                   'RK_ORDER': int(self.rk_order),
-                   'NX': int(self.nx),
-                   'NY': int(self.ny),
+                   'RK_ORDER': self.rk_order,
+                   'NX': self.nx,
+                   'NY': self.ny,
                    'DX': "{:.12f}f".format(self.dx),
                    'DY': "{:.12f}f".format(self.dy),
                    'GRAV': "{:.12f}f".format(self.g),
                    'FRIC': "{:.12f}f".format(self.r),
                    'RHO_O': "{:.12f}f".format(rho_o),
                    'WIND_STRESS_FACTOR': "{:.12f}f".format(wind_stress_factor),
-                   'ONE_DIMENSIONAL': int(0),
+                   'ONE_DIMENSIONAL': 0,
                    'FLUX_BALANCER': "{:.12f}f".format(flux_balancer),
-                   'CORIOLIS_F_NX': int(coriolis_f.shape[1]),
-                   'CORIOLIS_F_NY': int(coriolis_f.shape[0]),
-                   'ANGLE_NX': int(angle.shape[1]),
-                   'ANGLE_NY': int(angle.shape[0]),
-                   'ATMOS_PRES_NX': int(self.atmospheric_pressure.P[0].shape[1]),
-                   'ATMOS_PRES_NY': int(self.atmospheric_pressure.P[0].shape[0]),
-                   'WIND_STRESS_X_NX': int(self.wind_stress.stress_u[0].shape[1]),
-                   'WIND_STRESS_X_NY': int(self.wind_stress.stress_u[0].shape[0]),
-                   'WIND_STRESS_Y_NX': int(self.wind_stress.stress_v[0].shape[1]),
-                   'WIND_STRESS_Y_NY': int(self.wind_stress.stress_v[0].shape[0]),
-                   'USE_DIRECT_LOOKUP': bool(use_direct_lookup)
+                   'CORIOLIS_F_NX': coriolis_f.shape[1],
+                   'CORIOLIS_F_NY': coriolis_f.shape[0],
+                   'ANGLE_NX': angle.shape[1],
+                   'ANGLE_NY': angle.shape[0],
+                   'ATMOS_PRES_NX': self.atmospheric_pressure.P[0].shape[1],
+                   'ATMOS_PRES_NY': self.atmospheric_pressure.P[0].shape[0],
+                   'WIND_STRESS_X_NX': self.wind_stress.stress_u[0].shape[1],
+                   'WIND_STRESS_X_NY': self.wind_stress.stress_u[0].shape[0],
+                   'WIND_STRESS_Y_NX': self.wind_stress.stress_v[0].shape[1],
+                   'WIND_STRESS_Y_NY': self.wind_stress.stress_v[0].shape[0],
+                   'USE_DIRECT_LOOKUP': use_direct_lookup
                    }
 
         if one_dimensional:
-            defines['ONE_DIMENSIONAL'] = int(1)
+            defines['ONE_DIMENSIONAL'] = 1
 
         # Get kernels
         self.kernel = gpu_ctx.get_kernel("CDKLM16_kernel",
@@ -335,7 +334,7 @@ class CDKLM16(Simulator.Simulator):
         # Allocate memory for calculating maximum timestep
         host_dt = np.zeros((self.global_size[1], self.global_size[0]), dtype=np.float32)
         self.device_dt = Array2D(self.gpu_stream, self.global_size[0], self.global_size[1],
-                                 0, 0, host_dt)
+                                 0, 0, host_dt, padded=False)
         host_max_dt_buffer = np.zeros((1, 1), dtype=np.float32)
         self.max_dt_buffer = Array2D(self.gpu_stream, 1, 1, 0, 0, host_max_dt_buffer)
         self.courant_number = courant_number
@@ -690,10 +689,10 @@ class CDKLM16(Simulator.Simulator):
         # "Beautify" code a bit by packing four int8s into a single int32
         # Note: Must match code in kernel!
         boundary_conditions = 0
-        boundary_conditions = boundary_conditions | (self.boundary_conditions.north.value << 24)
-        boundary_conditions = boundary_conditions | (self.boundary_conditions.south.value << 16)
-        boundary_conditions = boundary_conditions | (self.boundary_conditions.east.value << 8)
-        boundary_conditions = boundary_conditions | (self.boundary_conditions.west.value << 0)
+        boundary_conditions = boundary_conditions | (int(self.boundary_conditions.north) << 24)
+        boundary_conditions = boundary_conditions | (int(self.boundary_conditions.south) << 16)
+        boundary_conditions = boundary_conditions | (int(self.boundary_conditions.east) << 8)
+        boundary_conditions = boundary_conditions | (int(self.boundary_conditions.west) << 0)
 
         self.cdklm_swe_2D.async_call(self.global_size, self.local_size, self.gpu_stream,
                                      [local_dt,
@@ -835,8 +834,12 @@ class CDKLM16(Simulator.Simulator):
                                                  self.device_dt.pointer,
                                                  self.max_dt_buffer.pointer])
 
-        dt_host = self.max_dt_buffer.download(self.gpu_stream)
-        self.dt = courant_number * float(dt_host[0, 0])
+        dt_host = float(self.max_dt_buffer.download(self.gpu_stream)[0, 0])
+
+        if dt_host == 0:
+            raise RuntimeError("Change in time (dt) is zero.")
+
+        self.dt = courant_number * float(dt_host)
 
     def _getMaxTimestepHost(self, courant_number=0.8):
         """
