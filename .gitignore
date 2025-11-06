@@ -6,7 +6,7 @@
 /.pydevproject
 .ipynb_checkpoints/
 .vscode/
-cuda_cache/
+.gpuocean_cache/
 /data/
 
 # Ignored file types
