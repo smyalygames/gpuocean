@@ -23,23 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import time
 import abc
-import warnings
 
-import matplotlib
-from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 
-from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import Common, WindStress, OceanographicUtilities
-from gpuocean.drifters import GPUDrifterCollection
+from gpuocean.utils import OceanographicUtilities
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
-
-if TYPE_CHECKING:
-    from gpuocean.utils.gpu import GPUHandler
 
 
 class BaseOceanStateEnsemble(object):
@@ -114,24 +103,24 @@ class BaseOceanStateEnsemble(object):
                     assert (not innovation), 'Innovation is not supported when the observations are made on the GPU'
 
                     sim = self.particles[p]
-                    self.observeUnderlyingFlowKernel.prepared_async_call(self.global_size,
+                    self.observeUnderlyingFlowKernel.async_call(self.global_size,
                                                                          self.local_size,
                                                                          self.gpu_stream,
                                                                          [sim.nx, sim.ny, sim.dx, sim.dy,
                                                                          2, 2,
-                                                                         sim.gpu_data.h0.data.gpudata,
+                                                                         sim.gpu_data.h0.pointer,
                                                                          sim.gpu_data.h0.pitch,
-                                                                         sim.gpu_data.hu0.data.gpudata,
+                                                                         sim.gpu_data.hu0.pointer,
                                                                          sim.gpu_data.hu0.pitch,
-                                                                         sim.gpu_data.hv0.data.gpudata,
+                                                                         sim.gpu_data.hv0.pointer,
                                                                          sim.gpu_data.hv0.pitch,
                                                                          np.max(self.base_H),
                                                                          self.driftersPerOceanModel,
                                                                          self.particles[
-                                                                             self.obs_index].drifters.driftersDevice.data.gpudata,
+                                                                             self.obs_index].drifters.driftersDevice.pointer,
                                                                          self.particles[
                                                                              self.obs_index].drifters.driftersDevice.pitch,
-                                                                         self.observation_buffer.data.gpudata,
+                                                                         self.observation_buffer.pointer,
                                                                          self.observation_buffer.pitch])
 
                     observedParticles[p, :, :] = self.observation_buffer.download(self.gpu_stream)

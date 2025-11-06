@@ -24,17 +24,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import time
-import abc
-
-from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 
 from gpuocean.SWEsimulators import CDKLM16
 from gpuocean.drifters import GPUDrifterCollection
 from gpuocean.utils import WindStress
-from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 from gpuocean.ensembles import BaseOceanStateEnsemble
 
 

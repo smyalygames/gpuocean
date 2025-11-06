@@ -25,20 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import time
 import gc
-import abc
-import warnings
 import os, sys, datetime
 
-from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
 
-import pycuda.driver as cuda
-
 from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import Common, ParticleInfo, Observation, SimReader
+from gpuocean.utils import ParticleInfo, Observation, SimReader
 from gpuocean.ensembles import BaseOceanStateEnsemble
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 from gpuocean.utils.gpu import GPUStream
