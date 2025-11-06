@@ -23,15 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 
-from gpuocean.utils import Common
+from gpuocean.utils.Common import BoundaryConditions
 from gpuocean.drifters import BaseDrifterCollection
 
 class CPUDrifterCollection(BaseDrifterCollection.BaseDrifterCollection):
     """
     Class holding the collection of drifters.
     """ 
-    def __init__(self, numDrifters, observation_variance=0.01,
-                 boundaryConditions=Common.BoundaryConditions(), 
+    def __init__(self, numDrifters: int, observation_variance=0.01,
+                 boundaryConditions=BoundaryConditions(),
                  initialization_cov_drifters=None,
                  domain_size_x=1.0, domain_size_y=1.0,
                  initialize=False):

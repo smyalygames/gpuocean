@@ -22,13 +22,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import abc
 
 from matplotlib import pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import abc
 
-from gpuocean.utils import Common
+from gpuocean.utils.Common import BoundaryConditions
 
 class BaseDrifterCollection(object):    
     """
@@ -38,8 +38,8 @@ class BaseDrifterCollection(object):
     
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, numDrifters, observation_variance=0.1,
-                 boundaryConditions=Common.BoundaryConditions(),
+    def __init__(self, numDrifters: int, observation_variance=0.1,
+                 boundaryConditions=BoundaryConditions(),
                  domain_size_x=1.0, domain_size_y=1.0):
         """
         Creates a GlobalParticles object for drift trajectory ensemble.
@@ -98,28 +98,28 @@ class BaseDrifterCollection(object):
     
     
     ### GETs
-    def getNumDrifters(self):
+    def getNumDrifters(self) -> int:
         #print "\n\nUsing DrifterCollection::getNumDrifters()\n"
         return self.numDrifters
     
-    def getObservationVariance(self):
+    def getObservationVariance(self) -> float:
         return self.observation_variance
     
-    def getBoundaryConditions(self):
+    def getBoundaryConditions(self) -> BoundaryConditions:
         return self.boundaryConditions
     
-    def getDomainSizeX(self):
+    def getDomainSizeX(self) -> float:
         return self.domain_size_x
     
-    def getDomainSizeY(self):
+    def getDomainSizeY(self) -> float:
         return self.domain_size_y
         
         
     ### SETs
-    def setBoundaryConditions(self, boundaryConditions):
-        self.boundaryConditions = boundaryConditions
+    def setBoundaryConditions(self, boundary_conditions: BoundaryConditions) -> None:
+        self.boundaryConditions = boundary_conditions
         
-    def setDomainSize(self, size_x, size_y):
+    def setDomainSize(self, size_x, size_y) -> None:
         self.domain_size_x = size_x
         self.domain_size_y = size_y
         
@@ -272,7 +272,7 @@ class BaseDrifterCollection(object):
     
     
     
-    def _enforceBoundaryConditionsOnPosition(self, x, y):
+    def _enforceBoundaryConditionsOnPosition(self, x: float, y: float) -> tuple[float, float]:
         """
         Maps the given coordinate to a coordinate within the domain. This function assumes that periodic boundary conditions are used, and should be considered as a private function.
         """
@@ -301,7 +301,7 @@ class BaseDrifterCollection(object):
     
     
     
-    def resample(self, newSampleIndices, reinitialization_variance):
+    def resample(self, newSampleIndices, reinitialization_variance) -> None:
         """
         Resamples the particle positions at the given indices. Duplicates are resampled from a gaussian distribution.
 
@@ -361,7 +361,7 @@ class BaseDrifterCollection(object):
         self.setDrifterPositions(positions[:-1, :])
         self.setObservationPosition(positions[-1, :])
     
-    def plotDistanceInfo(self, title=None):
+    def plotDistanceInfo(self, title: str=None) -> None:
         """
         Utility function for generating informative plots of the ensemble relative to the observation
         """    

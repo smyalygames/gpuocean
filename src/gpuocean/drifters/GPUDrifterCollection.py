@@ -27,12 +27,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from gpuocean.drifters.BaseDrifterCollection import BaseDrifterCollection
-from gpuocean.utils import WindStress
+from gpuocean.utils.WindStress import WindStress
 from gpuocean.utils.Common import BoundaryConditions
 from gpuocean.utils.gpu import GPUHandler, GPUStream, Array2D
 
 if TYPE_CHECKING:
-    from gpuocean.utils.gpu import KernelContext
+    from gpuocean.utils.gpu import KernelContext, module_t
 
 
 class GPUDrifterCollection(BaseDrifterCollection):
@@ -43,7 +43,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
                  domain_size_x=1.0, domain_size_y=1.0,
                  gpu_stream: GPUStream = None,
                  initialize=False,
-                 wind=WindStress.WindStress(),
+                 wind=WindStress(),
                  wind_drift_factor=0.0,
                  block_width=64):
 
@@ -58,7 +58,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
         self.block_width = block_width
         self.block_height = 1
         self.wind = wind
-        self.wind_drift_factor = np.float32(wind_drift_factor)
+        self.wind_drift_factor = float(wind_drift_factor)
 
         self.gpu_stream = gpu_stream
         if self.gpu_stream is None:
@@ -66,7 +66,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
 
         self.sensitivity = 1.0
 
-        self.driftersHost = np.zeros((self.getNumDrifters() + 1, 2)).astype(np.float32, order='C')
+        self.driftersHost = np.zeros((self.getNumDrifters() + 1, 2), dtype=np.float32, order='C')
         self.driftersDevice = Array2D(self.gpu_stream,
                                       2, self.getNumDrifters() + 1, 0, 0,
                                       self.driftersHost)
@@ -74,10 +74,10 @@ class GPUDrifterCollection(BaseDrifterCollection):
         self.drift_kernels = gpu_ctx.get_kernel("driftKernels",
                                                 defines={'block_width': self.block_width,
                                                          'block_height': self.block_height,
-                                                         'WIND_X_NX': int(self.wind.wind_u[0].shape[1]),
-                                                         'WIND_X_NY': int(self.wind.wind_u[0].shape[0]),
-                                                         'WIND_Y_NX': int(self.wind.wind_v[0].shape[1]),
-                                                         'WIND_Y_NY': int(self.wind.wind_v[0].shape[0])
+                                                         'WIND_X_NX': self.wind.wind_u[0].shape[1],
+                                                         'WIND_X_NY': self.wind.wind_u[0].shape[0],
+                                                         'WIND_Y_NX': self.wind.wind_v[0].shape[1],
+                                                         'WIND_Y_NY': self.wind.wind_v[0].shape[0]
                                                          })
         # Define wind arrays
         t = 0  # TODO: check if this is correct
@@ -85,19 +85,21 @@ class GPUDrifterCollection(BaseDrifterCollection):
         t0_index = max(0, np.searchsorted(self.wind.t, t) - 1)
         t1_index = min(t_max_index, int(np.searchsorted(self.wind.t, t)))
         self.wind_x_current_arr = Array2D(self.gpu_stream,
-                                          self.wind.wind_u[t0_index].shape[1], self.wind.wind_u[t0_index].shape[0], 0,
-                                          0,
-                                          self.wind.wind_u[t0_index])
+                                          self.wind.wind_u[t0_index].shape[1], self.wind.wind_u[t0_index].shape[0],
+                                          0,0,
+                                          self.wind.wind_u[t0_index], padded=False)
         self.wind_y_current_arr = Array2D(self.gpu_stream,
-                                          self.wind.wind_v[t0_index].shape[1], self.wind.wind_v[t0_index].shape[0], 0,
-                                          0,
-                                          self.wind.wind_v[t0_index])
+                                          self.wind.wind_v[t0_index].shape[1], self.wind.wind_v[t0_index].shape[0],
+                                          0, 0,
+                                          self.wind.wind_v[t0_index], padded=False)
         self.wind_x_next_arr = Array2D(self.gpu_stream,
-                                       self.wind.wind_u[t1_index].shape[1], self.wind.wind_u[t1_index].shape[0], 0, 0,
-                                       self.wind.wind_u[t1_index])
+                                       self.wind.wind_u[t1_index].shape[1], self.wind.wind_u[t1_index].shape[0],
+                                       0, 0,
+                                       self.wind.wind_u[t1_index], padded=False)
         self.wind_y_next_arr = Array2D(self.gpu_stream,
-                                       self.wind.wind_v[t1_index].shape[1], self.wind.wind_v[t1_index].shape[0], 0, 0,
-                                       self.wind.wind_v[t1_index])
+                                       self.wind.wind_v[t1_index].shape[1], self.wind.wind_v[t1_index].shape[0],
+                                       0, 0,
+                                       self.wind.wind_v[t1_index], padded=False)
 
         # Get CUDA functions and define data types for prepared_{async_}call()
         self.passiveDrifterKernel = GPUHandler(self.drift_kernels, "passiveDrifterKernel",
@@ -110,9 +112,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
             self.update_wind(self.drift_kernels, 0.0)
 
         self.local_size = (self.block_width, self.block_height, 1)
-        self.global_size = (
-            int(np.ceil((self.getNumDrifters() + 2) / float(self.block_width))),
-            1)
+        self.global_size = (int(np.ceil((self.getNumDrifters() + 2) / float(self.block_width))), 1)
 
         # Initialize drifters:
         if initialize:
@@ -137,7 +137,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
 
         return copyOfSelf
 
-    def update_wind(self, kernel_module, t):
+    def update_wind(self, kernel_module: module_t, t: float) -> float:
         # Key used to access the hashmaps
         key = str(kernel_module)
 
@@ -225,7 +225,7 @@ class GPUDrifterCollection(BaseDrifterCollection):
                                               Hm.pointer, Hm.pitch,
                                               int(self.boundaryConditions.isPeriodicNorthSouth()),
                                               int(self.boundaryConditions.isPeriodicEastWest()),
-                                              int(self.getNumDrifters()),
+                                              self.getNumDrifters(),
                                               self.driftersDevice.pointer,
                                               self.driftersDevice.pitch,
                                               self.sensitivity,
@@ -250,6 +250,6 @@ class GPUDrifterCollection(BaseDrifterCollection):
                                                              self.domain_size_y,
                                                              int(self.boundaryConditions.isPeriodicNorthSouth()),
                                                              int(self.boundaryConditions.isPeriodicEastWest()),
-                                                             int(self.numDrifters),
+                                                             self.numDrifters,
                                                              self.driftersDevice.pointer,
                                                              self.driftersDevice.pitch])
