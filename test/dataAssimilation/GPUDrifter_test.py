@@ -22,9 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import gc
 
-from testUtils import *
-
 from gpuocean.drifters.GPUDrifterCollection import *
+from gpuocean.utils.gpu import KernelContext
 from dataAssimilation.BaseDrifterTest import BaseDrifterTest
 
 

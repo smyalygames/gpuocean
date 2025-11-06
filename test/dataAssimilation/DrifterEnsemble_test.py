@@ -20,36 +20,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import unittest
-import time
-import numpy as np
-import sys
-import gc
-
-import abc
-
-from testUtils import *
-
 from gpuocean.utils.gpu import KernelContext
-from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 
 from gpuocean.ensembles import DrifterEnsemble
 from dataAssimilation.BaseDrifterEnsembleTest import BaseDrifterEnsembleTest
 
+
 class DrifterEnsembleTest(BaseDrifterEnsembleTest):
-    #__metaclass__ = abc.ABCMeta
-    
+
     def setUp(self):
         super(DrifterEnsembleTest, self).setUp()
-        
+
         self.gpu_ctx = KernelContext()
-                
+
     def tearDown(self):
         super(DrifterEnsembleTest, self).tearDown()
 
-    ### Define required functions as abstract ###
-
-    #@abc.abstractmethod
     def create_small_particle_set(self):
         self.smallParticleSet = DrifterEnsemble.DrifterEnsemble(self.gpu_ctx,
                                                                 self.numParticles,
@@ -58,9 +44,7 @@ class DrifterEnsembleTest(BaseDrifterEnsembleTest):
                                           self.boundaryCondition)
         self.smallParticleSet.setParameters()
         self.smallParticleSet.init()
-        
 
-    #@abc.abstractmethod
     def create_resampling_particle_set(self):
         self.resamplingParticleSet = DrifterEnsemble.DrifterEnsemble(self.gpu_ctx,
                                                                      self.resampleNumParticles,
@@ -68,15 +52,12 @@ class DrifterEnsembleTest(BaseDrifterEnsembleTest):
         self.resamplingParticleSet.setGridInfo(self.nx, self.ny, self.dx, self.dy, self.dt)
         self.resamplingParticleSet.setParameters()
         self.resamplingParticleSet.init()
-        
 
-    #@abc.abstractmethod
     def create_large_particle_set(self, size, domain_x, domain_y):
         largeParticleSet = DrifterEnsemble.DrifterEnsemble(self.gpu_ctx,
                                                            size)
-        largeParticleSet.setGridInfo(10, 10, domain_x/10.0, domain_y/10.0, self.dt,
-                                               self.boundaryCondition)
+        largeParticleSet.setGridInfo(10, 10, domain_x / 10.0, domain_y / 10.0, self.dt,
+                                     self.boundaryCondition)
         largeParticleSet.setParameters()
         largeParticleSet.init()
         return largeParticleSet
-

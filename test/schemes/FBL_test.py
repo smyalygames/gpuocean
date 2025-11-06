@@ -68,7 +68,7 @@ class FBLtest(unittest.TestCase):
         self.u0 = None 
         self.v0 = None
         if self.gpu_ctx is not None:
-            # self.assertEqual(sys.getrefcount(self.gpu_ctx), 2) # TODO Check if this is broken or what value it should be
+            self.assertEqual(sys.getrefcount(self.gpu_ctx), 2) # TODO Check if this is broken or what value it should be
             self.gpu_ctx = None
         gc.collect() # Force run garbage collection to free up memory
         

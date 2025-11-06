@@ -185,7 +185,7 @@ class ConservationOfMassTest(unittest.TestCase):
         self.setupSimAndRun("CTCS")
 
     # FIXME causes fatal error for the next test
-    def notest_conservationOfMass_KP_KelvinWaves(self):
+    def test_conservationOfMass_KP_KelvinWaves(self):
         self.setupSimAndRun("KP")
 
     def test_conservationOfMass_CDKLM_KelvinWaves(self):
