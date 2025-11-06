@@ -507,7 +507,7 @@ class IEWPFOcean:
                                               sim.gpu_stream,
                                               [sim.model_error.rand_nx,
                                                sim.model_error.rand_ny,
-                                               sim.model_error.random_numbers.data.gpudata,
+                                               sim.model_error.random_numbers.pointer,
                                                sim.model_error.random_numbers.pitch])
 
     def addBetaNuIntoAlphaXi(self, sim, alpha, beta):
@@ -527,12 +527,12 @@ class IEWPFOcean:
                                           sim.gpu_stream,
                                           [sim.model_error.rand_nx,
                                            sim.model_error.rand_ny,
-                                           sim.model_error.random_numbers.data.gpudata,
+                                           sim.model_error.random_numbers.pointer,
                                            sim.model_error.random_numbers.pitch,
-                                           sim.model_error.perpendicular_random_numbers.data.gpudata,
+                                           sim.model_error.perpendicular_random_numbers.pointer,
                                            sim.model_error.perpendicular_random_numbers.pitch,
-                                           np.float32(np.sqrt(alpha)),
-                                           np.float32(np.sqrt(beta))])
+                                           float(np.sqrt(alpha)),
+                                           float(np.sqrt(beta))])
 
     def addKalmanGain(self, sim, all_observed_drifter_positions, innovation, drifter_id=None):
         """
@@ -569,7 +569,7 @@ class IEWPFOcean:
                                                              coarse_cell_id_x, coarse_cell_id_y,
                                                              self.geoBalanceConst,
                                                              float(e[0, 0]), float(e[0, 1]),
-                                                             sim.model_error.random_numbers.data.gpudata,
+                                                             sim.model_error.random_numbers.pointer,
                                                              sim.model_error.random_numbers.pitch])
 
             phi += local_innovation[0] * e[0, 0] + local_innovation[1] * e[0, 1]
@@ -629,9 +629,9 @@ class IEWPFOcean:
                                                  [self.coarse_nx, self.coarse_ny,
                                                   int(drifter_coarse_cell_id_x),
                                                   int(drifter_coarse_cell_id_y),
-                                                  self.localSVD_device.data.gpudata,
+                                                  self.localSVD_device.pointer,
                                                   self.localSVD_device.pitch,
-                                                  random_numbers.data.gpudata,
+                                                  random_numbers.pointer,
                                                   random_numbers.pitch])
 
     def applyLocalSVDOnGlobalXi(self, sim, drifter_coarse_cell_id_x, drifter_coarse_cell_id_y):
