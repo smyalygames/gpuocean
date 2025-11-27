@@ -1,0 +1,63 @@
+BootStrap: docker
+From: rocm/dev-ubuntu-24.04:6.4.3
+
+%environment
+    export PATH=/uv:$PATH
+    export UV_PROJECT_ENVIRONMENT=/writeable/.venv
+    export VIRTUAL_ENV=/writeable/.venv
+    export UV_LINK_MODE=copy
+
+%files
+   .python-version /workdir/.python-version
+   pyproject.toml /workdir/pyproject.toml
+   uv.lock /workdir/uv.lock
+
+%post
+    # Version values
+    # MPI on LUMI is 3.4a2
+    export MPICH_VERSION=3.4.3
+    export MPICH_URL="http://www.mpich.org/static/downloads/$MPICH_VERSION/mpich-$MPICH_VERSION.tar.gz"
+    # Python virtual environment directory
+
+    # Base OS
+    echo -e "\e[32m + \e[39mInstalling \e[1mrequired packages\e[0m..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y file g++ gcc gfortran make gdb strace wget curl ca-certificates build-essential
+
+
+    # Install MPICH
+    wget -q $MPICH_URL
+    tar xf mpich-$MPICH_VERSION.tar.gz
+    cd mpich-$MPICH_VERSION
+
+    ./configure --disable-fortran --enable-fast=all,O3 --prefix=/usr --with-device=ch3
+    make -j$(nproc)
+    make install
+    ldconfig
+
+    # Install uv
+    echo -e "\e[32m + \e[39mInstalling \e[uv\e[0m..."
+    mkdir /uv
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/uv sh
+    . /uv/env
+
+    # Create uv virtual environment
+    echo -e "\e[32m + \e[39mCreating \e[uv environment\e[0m..."
+    cd /workdir
+    UV_PROJECT_ENVIRONMENT=/writeable/.venv uv sync --no-cache
+
+    # Install Jupyter Labs
+    #uv tool install jupyterlab
+
+    # Cleanup
+    apt-get clean
+    rm -rf /var/lib/apt /var/lib/dpkg /var/lib/cache /var/lib/log
+
+%runscript
+    cd /workdir
+    uv --no-cache run $1
+
+%help
+    This is a container built for running GPU Ocean on LUMI-G.
+    It includes MPICH and the required uv packages.
