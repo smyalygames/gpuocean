@@ -23,6 +23,7 @@ dependencies = [
     "tqdm",
     "hip-python >=6.4.4,<7",
     "notebook>=7.4.7",
+    "cupy-rocm-5-0>=13.3.0",
 ]
 
 [tool.uv.sources]

@@ -17,7 +17,8 @@ if __env_name in environ and environ.get(__env_name).lower() == "cuda":
         stream_t = driver.Stream
         module_t = driver.Module
 else:
-    from .arrays.hip.hip_array2d import HIPArray2D as Array2D
+    # from .arrays.hip.hip_array2d import HIPArray2D as Array2D
+    from .arrays.cupy.cupy_array2d import CuPyArray2D as Array2D
     from .arrays.hip.hip_array3d import HIPArray3D as Array3D
     from .kernels.hip.hip_context import HIPContext as KernelContext
     from .kernels.hip.hip_handler import HIPHandler as GPUHandler
