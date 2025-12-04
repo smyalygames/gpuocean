@@ -263,16 +263,14 @@ wheels = [
 ]
 
 [[package]]
-name = "cupy-rocm-5-0"
-version = "13.3.0"
+name = "cupy"
+version = "13.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastrlock" },
     { name = "numpy" },
 ]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/2e/6e4ecd65f5158808a54ef75d90fc7a884afb55bd405c4a7dbc34bb4a8f96/cupy_rocm_5_0-13.3.0-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:d4c370441f7778b00f3ab80d6f0d669ea0215b6e96bbed9663ecce7ffce83fa9", size = 60056031, upload-time = "2024-08-22T07:08:00.414Z" },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/95/c2c7b5dca22dd7409308d076c33c681f810efd77e2b62e5107027cc98597/cupy-13.6.0.tar.gz", hash = "sha256:3cba30ae3dd32b5d5c6536e710cb98015227cd4ba83c46b3f1825a7ae55b6667", size = 3319720, upload-time = "2025-08-18T08:33:04.503Z" }
 
 [[package]]
 name = "cycler"
@@ -415,7 +413,7 @@ name = "gpuocean"
 version = "1.4.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "cupy-rocm-5-0" },
+    { name = "cupy" },
     { name = "gitpython" },
     { name = "hip-python" },
     { name = "matplotlib" },
@@ -438,7 +436,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cupy-rocm-5-0", specifier = ">=13.3.0" },
+    { name = "cupy" },
     { name = "gitpython" },
     { name = "hip-python", specifier = ">=6.4.4,<7", index = "https://test.pypi.org/simple/" },
     { name = "matplotlib" },

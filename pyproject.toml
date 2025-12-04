@@ -22,9 +22,12 @@ dependencies = [
     "scikit-image",
     "tqdm",
     "hip-python >=6.4.4,<7",
+    "cupy",
     "notebook>=7.4.7",
-    "cupy-rocm-5-0>=13.3.0",
 ]
+
+[tool.uv]
+extra-build-variables = { cupy = { CUPY_INSTALL_USE_HIP="1", ROCM_HOME="/opt/rocm", HCC_AMDGPU_TARGET="gfx1030" } }
 
 [tool.uv.sources]
 hip-python = { index = "hip" }
