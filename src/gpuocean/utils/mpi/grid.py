@@ -1,5 +1,6 @@
 from typing import Literal
 from dataclasses import dataclass
+import math
 
 
 @dataclass
@@ -32,10 +33,13 @@ class Grid:
         self.rank = rank
 
         # Subdomain grid size
-        self.nx, self.ny = self._decompose_domain()
+        self.x, self.y = self._decompose_domain()
 
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
+
+        # Calculate the size of the local subdomain
+        self.nx, self.ny = self._calculate_subdomain_size()
 
         # Get the coordinates of all the neighbors
         self.north = self.get_neighbor("north")
@@ -80,18 +84,44 @@ class Grid:
         Calculate the coordinate for the rank of this process.
         :returns: This rank's coordinates, with indexing starting at 0.
         """
-        y = self.rank // self.nx
-        x = self.rank % self.nx
+        y = self.rank // self.x
+        x = self.rank % self.x
 
         # Checks that the coordinates are sane.
-        if y > self.ny - 1:
+        if y > self.y - 1:
             raise RuntimeError("Processed y-coordinate in grid is out of bounds.")
-        if x > self.nx - 1:
+        if x > self.x - 1:
             raise RuntimeError("Processed x-coordinate in grid is out of bounds.")
 
         coordinates = Coordinate(x, y)
 
         return coordinates
+
+    def _calculate_subdomain_size(self) -> tuple[int, int]:
+        """
+        Calculates the size of the subdomain,
+        taking into account divisions with remainders from the original domain.
+        :returns: Size of the subdomain in the x- and y-axis respectively.
+        """
+        x_remainder = (self.domain_nx - self.location.x) % self.x
+        y_remainder = (self.domain_ny - self.location.y) % self.y
+
+        # Calculate the size of the subdomain
+        nx = self.domain_nx / self.x
+        ny = self.domain_ny / self.y
+
+        # Account for decimals
+        if x_remainder == 0:
+            nx = math.floor(nx)
+        else:
+            nx = math.ceil(nx)
+
+        if y_remainder == 0:
+            ny = math.floor(ny)
+        else:
+            ny = math.ceil(ny)
+
+        return nx, ny
 
     def get_neighbor(self, direction: Literal["north", "east", "south", "west"]) -> Coordinate | None:
         """
@@ -104,7 +134,7 @@ class Grid:
             case "north":
                 new_y = self.location.y + 1
                 # Check if the new y location goes out of bounds of the grid
-                if new_y >= self.ny:
+                if new_y >= self.y:
                     return None
 
                 return Coordinate(self.location.x, new_y)
@@ -118,7 +148,7 @@ class Grid:
             case "east":
                 new_x = self.location.x + 1
                 # Check if the new x location goes out of bounds of the grid
-                if new_x >= self.nx:
+                if new_x >= self.x:
                     return None
 
                 return Coordinate(new_x, self.location.y)
