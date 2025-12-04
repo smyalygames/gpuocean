@@ -28,6 +28,7 @@ dependencies:
 - seawater
 - gitpython
 - scikit-image
+- ipyparallel
 - pip:
     - hip-python==6.4.1.552.39
     - --extra-index-url https://test.pypi.org/simple/
