@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TypeVar, Generic, Union, TYPE_CHECKING
+from typing import TypeVar, Generic, Union, Literal, TYPE_CHECKING
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]
+direction_t = Literal["north", "east", "south", "west"]
 
 
 class BaseArray2D(ABC, Generic[T]):
@@ -32,6 +33,8 @@ class BaseArray2D(ABC, Generic[T]):
 
         self.nx = nx
         self.ny = ny
+        self.halo_x = halo_x
+        self.halo_y = halo_y
         self.nx_halo = nx + 2 * halo_x
         self.ny_halo = ny + 2 * halo_y
         if asym_halo is not None and len(asym_halo) == 4:
@@ -93,10 +96,57 @@ class BaseArray2D(ABC, Generic[T]):
         """
 
     @abstractmethod
+    def upload_boundary(self, gpu_stream: GPUStream, data: data_t, direction: direction_t) -> None:
+        """
+        Uploads data for the same size of boundary to the GPU array.
+        :param gpu_stream: Stream for GPU function calls.
+        :param data: Boundary data to upload to the GPU array.
+        :param direction: What part of the array to upload to.
+        """
+
+    @abstractmethod
+    def download_boundary(self, gpu_stream: GPUStream, direction: direction_t) -> data_t:
+        """
+        Downloads the data for the boundary to transfer to another node.
+        :param gpu_stream: Stream for function GPU function calls.
+        :param direction: What part of the array to download from.
+        :returns: Part of the array in the direction specified by the ``direction`` parameter.
+        """
+
+    @abstractmethod
     def release(self) -> None:
         """
         Frees the allocated memory buffers on the GPU
         """
+
+    def _get_boundary_coordinates(self, direction: direction_t) -> tuple[tuple[int, int], tuple[int, int]]:
+        """
+        Gets the coordinates/shape of the boundary for the specified direction.
+        :param direction: Part of the array to get the direction from.
+        :returns: Two coordinates (y, x) representing the edges of the boundaries.
+        """
+        match direction:
+            case "north":
+                return (0, 0), (self.halo_y, self.nx_halo)
+            case "east":
+                return (0, self.halo_x + self.nx), (self.nx_halo, self.nx_halo)
+            case "south":
+                return (self.halo_y + self.ny, 0), (self.ny_halo, self.nx_halo)
+            case "west":
+                return (0, 0), (self.ny_halo, self.halo_x)
+            case _:
+                raise ValueError(f"Given argument for direction is invalid ({direction}). Only {direction_t} is valid.")
+
+    def _get_boundary_shape(self, direction: direction_t) -> tuple[int, int]:
+        """
+        Gets the shape of the array for the boundary
+        :param: What side of the array to get the shape of.
+        :returns: Shape of the GPU array, (y, x), by the given side of the boundary.
+        """
+        coordinates = self._get_boundary_coordinates(direction)
+        shape = (coordinates[1][0] - coordinates[0][0], coordinates[1][1] - coordinates[0][1])
+
+        return shape
 
     def _convert_to_precision(self, data: data_t) -> data_t:
         """
