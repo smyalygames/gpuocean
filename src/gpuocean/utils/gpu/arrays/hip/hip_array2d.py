@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from hip import hip
@@ -101,7 +101,7 @@ class HIPArray2D(BaseArray2D):
         """
 
         if not self.holds_data:
-            raise RuntimeError('HIP buffer has been freed')
+            raise RuntimeError('HIP buffer has been freed.')
 
         data = np.zeros(self.shape, dtype=self.dtype)
 
@@ -109,6 +109,51 @@ class HIPArray2D(BaseArray2D):
         src = Device(self.pointer, self.pitch, self.dtype)
         dst = Host(data)
         transfer = Transfer(src, dst, self.width, self.height)
+        copy = transfer.get_transfer()
+
+        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
+
+        return data
+
+    def upload_boundary(self, gpu_stream: HIPStream, data, direction) -> None:
+        if not self.holds_data:
+            raise RuntimeError('The buffer has been freed before upload is called')
+
+        if np.ma.is_masked(data):
+            self.mask = data.mask
+
+        # Make sure that the input is of correct size:
+        host_data = self._convert_to_precision(data)
+
+        start, _ = self._get_boundary_coordinates(direction)
+        shape = self._get_boundary_shape(direction)
+
+        # Check that the shape is correct
+        if host_data.shape != shape:
+            raise ValueError(f"The shape of the boundary data is not correct. Expected shape: {shape};"
+                             f" Shape of passed data: {host_data.shape}.")
+
+        # Parameters to copy to GPU memory
+        src = Host(data)
+        dst = Device(self.pointer, self.pitch, self.dtype, x=start[1], y=start[0])
+        transfer = Transfer(src, dst, shape[1] * self.bytes_per_float, shape[0])
+        copy = transfer.get_transfer()
+
+        hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
+
+    def download_boundary(self, gpu_stream: HIPStream, direction) -> np.ndarray:
+        if not self.holds_data:
+            raise RuntimeError('HIP buffer has been freed.')
+
+        start, _ = self._get_boundary_coordinates(direction)
+        shape = self._get_boundary_shape(direction)
+
+        data = np.zeros(shape, dtype=self.dtype)
+
+        # Parameters to copy from GPU memory
+        src = Device(self.pointer, self.pitch, self.dtype, x=start[1], y=start[0])
+        dst = Host(data)
+        transfer = Transfer(src, dst, shape[1] * self.bytes_per_float, shape[0])
         copy = transfer.get_transfer()
 
         hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
