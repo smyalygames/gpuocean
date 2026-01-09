@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Import packages we need
 from __future__ import annotations
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 import logging
 from typing import TYPE_CHECKING
 
@@ -45,16 +45,16 @@ if TYPE_CHECKING:
     from mpi4py import MPI
 
     from gpuocean.utils import WindStress, AtmosphericPressure
-    from gpuocean.utils.gpu import KernelContext
+    from gpuocean.utils.Common import BoundaryConditions
+    from gpuocean.utils.gpu import KernelContext, SWEDataArakawaA, SWEDataArakawaC
 
 reload(Common)
 
 
-class Simulator(object):
+class Simulator(ABC):
     """
     Baseclass for different numerical schemes, all 'solving' the SW equations.
     """
-    __metaclass__ = ABCMeta
 
     def __init__(self,
                  gpu_ctx: KernelContext,
@@ -78,6 +78,12 @@ class Simulator(object):
         """
         Setting all parameters that are common for all simulators
         """
+        # Variables to be initialized later
+        self.gpu_data: SWEDataArakawaA | SWEDataArakawaC = None
+        self.interior_domain_indices: npt.NDArray[np.int_] = None
+        self.boundary_conditions: BoundaryConditions
+
+
         self.gpu_stream = GPUStream()
 
         self.logger = logging.getLogger(__name__)
@@ -189,12 +195,12 @@ class Simulator(object):
             int(np.ceil(self.ny / float(self.local_size[1])))
         )
 
-    """
-    Function which updates the wind stress textures
-    @param kernel_module Module (from get_kernel in KernelContext)
-    """
-
     def update_wind_stress(self, kernel_module):
+        """
+        Function which updates the wind stress textures
+        :param kernel_module: Module (from get_kernel in KernelContext)
+        """
+
         # Key used to access the hashmaps
         key = str(kernel_module)
         self.logger.debug("Setting up wind stress for %s", key)
@@ -246,12 +252,12 @@ class Simulator(object):
 
         return wind_stress_t
 
-    """
-    Function which updates the atmospheric pressure data arrays
-    @param kernel_module Module (from get_kernel in KernelContext)
-    """
-
     def update_atmospheric_pressure(self, kernel_module):
+        """
+        Function which updates the atmospheric pressure data arrays
+        :param kernel_module: Module (from get_kernel in KernelContext)
+        """
+
         # Key used to access the hashmaps
         key = str(kernel_module)
         self.logger.debug("Setting up atmospheric pressure for %s", key)
@@ -377,9 +383,9 @@ class Simulator(object):
         """
         Download the second-latest time step from the GPU
         """
-        return self.gpu_data.downloadPrevTimestep(self.gpu_stream)
+        return self.gpu_data.download_prev_timestep(self.gpu_stream)
 
-    def copyState(self, otherSim):
+    def copyState(self, other_sim: Simulator):
         """
         Copies the state ocean state (eta, hu, hv), the wind object and 
         drifters (if any) from the other simulator.
@@ -389,29 +395,29 @@ class Simulator(object):
         initialized/assigned a perturbation should be copied here as well.
         """
 
-        assert type(otherSim) is type(
-            self), "A simulator can only copy the state from another simulator of the same class. Here we try to copy a " + str(
-            type(otherSim)) + " into a " + str(type(self))
+        if type(other_sim) is not type(self):
+            raise TypeError("A simulator can only copy the state from another simulator of the same class."
+                            f"Here we try to copy a {str(type(other_sim))} into a {str(type(self))}")
 
-        assert (self.ny, self.nx) == (otherSim.ny,
-                                      otherSim.nx), "Simulators differ in computational domain. Self (ny, nx): " + str(
-            (self.ny, self.nx)) + ", vs other: " + ((otherSim.ny, otherSim.nx))
+        if (self.ny, self.nx) != (other_sim.ny, other_sim.nx):
+            raise ValueError(f"Simulators differ in computational domain. Self (ny, nx): "
+                             f"{str((self.ny, self.nx))}, vs other: {(other_sim.ny, other_sim.nx)}")
 
-        self.gpu_data.h0.copyBuffer(self.gpu_stream, otherSim.gpu_data.h0)
-        self.gpu_data.hu0.copyBuffer(self.gpu_stream, otherSim.gpu_data.hu0)
-        self.gpu_data.hv0.copyBuffer(self.gpu_stream, otherSim.gpu_data.hv0)
+        self.gpu_data.h0.copyBuffer(self.gpu_stream, other_sim.gpu_data.h0)
+        self.gpu_data.hu0.copyBuffer(self.gpu_stream, other_sim.gpu_data.hu0)
+        self.gpu_data.hv0.copyBuffer(self.gpu_stream, other_sim.gpu_data.hv0)
 
-        self.gpu_data.h1.copyBuffer(self.gpu_stream, otherSim.gpu_data.h1)
-        self.gpu_data.hu1.copyBuffer(self.gpu_stream, otherSim.gpu_data.hu1)
-        self.gpu_data.hv1.copyBuffer(self.gpu_stream, otherSim.gpu_data.hv1)
+        self.gpu_data.h1.copyBuffer(self.gpu_stream, other_sim.gpu_data.h1)
+        self.gpu_data.hu1.copyBuffer(self.gpu_stream, other_sim.gpu_data.hu1)
+        self.gpu_data.hv1.copyBuffer(self.gpu_stream, other_sim.gpu_data.hv1)
 
         # Question: Which parameters should we require equal, and which 
         # should become equal?
-        self.wind_stress = otherSim.wind_stress
+        self.wind_stress = other_sim.wind_stress
 
-        if otherSim.hasDrifters and self.hasDrifters:
-            self.drifters.setDrifterPositions(otherSim.drifters.getDrifterPositions())
-            self.drifters.setObservationPosition(otherSim.drifters.getObservationPosition())
+        if other_sim.hasDrifters and self.hasDrifters:
+            self.drifters.setDrifterPositions(other_sim.drifters.getDrifterPositions())
+            self.drifters.setObservationPosition(other_sim.drifters.getObservationPosition())
 
     def upload(self, eta0: npt.NDArray, hu0: npt.NDArray, hv0: npt.NDArray, eta1: npt.NDArray=None, hu1: npt.NDArray=None, hv1: npt.NDArray=None):
         """
@@ -441,5 +447,5 @@ class Simulator(object):
         variable self.interior_domain_incides
         """
         if self.boundary_conditions.isSponge():
-            assert (
-                False), 'This function is deprecated - sponge cells should now be considered part of the interior domain'
+            raise RuntimeError('This function is deprecated - '
+                               'sponge cells should now be considered part of the interior domain')
