@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import gc
 import logging
-from scipy.interpolate import interp2d
+from scipy.interpolate import RectBivariateSpline
 
 from gpuocean.utils import Common, SimWriter, SimReader, WindStress, AtmosphericPressure
 from gpuocean.SWEsimulators import Simulator, OceanStateNoise, ModelErrorKL
@@ -181,9 +181,9 @@ class CDKLM16(Simulator.Simulator):
         def subsample_texture(data, factor):
             ny, nx = data.shape 
             dx, dy = 1/nx, 1/ny
-            I = interp2d(np.linspace(0.5*dx, 1-0.5*dx, nx), 
-                         np.linspace(0.5*dy, 1-0.5*dy, ny), 
-                         data, kind='linear')
+            I = RectBivariateSpline(np.linspace(0.5 * dx, 1 - 0.5 * dx, nx),
+                        np.linspace(0.5 * dy, 1 - 0.5 * dy, ny),
+                        data.T, kx=1, ky=1)
 
             new_nx, new_ny = max(2, nx//factor), max(2, ny//factor)
             new_dx, new_dy = 1/new_nx, 1/new_ny
