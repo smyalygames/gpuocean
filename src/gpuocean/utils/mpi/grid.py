@@ -1,5 +1,5 @@
-from typing import Literal
-from dataclasses import dataclass
+from typing import Literal, ClassVar
+from dataclasses import dataclass, field
 import math
 
 
@@ -11,12 +11,21 @@ class Coordinate:
     """
     x: int
     y: int
+    nx: ClassVar[int]
+    ny: ClassVar[int]
+    rank: int = field(init=False)
+
+    def __post_init__(self):
+        self.rank = (self.y * self.nx) + self.x
 
 
 class Grid:
     """
     Creates a grid that is a decomposition of the domain.
     """
+
+    domain_nx: int
+    domain_ny: int
 
     def __init__(self, nx: int, ny: int, total_nodes: int, rank: int):
         """
@@ -29,6 +38,8 @@ class Grid:
 
         self.domain_nx = nx
         self.domain_ny = ny
+        Coordinate.nx = nx
+        Coordinate.ny = ny
         self.total_nodes = total_nodes
         self.rank = rank
 
@@ -69,7 +80,7 @@ class Grid:
 
         # Figure out which factor has the smallest exchange perimeter
         best: tuple[int, int] = (0, 0)
-        best_perimeter: int = int('inf')
+        best_perimeter: int | float = math.inf
 
         for pair in factors:
             perimeter = (self.domain_nx * (pair[0] - 1)) + (self.domain_ny * (pair[1] - 1))
