@@ -129,7 +129,7 @@ class BaseArray2D(ABC, Generic[T]):
             case "north":
                 return (0, 0), (self.halo_y, self.nx_halo)
             case "east":
-                return (0, self.halo_x + self.nx), (self.nx_halo, self.nx_halo)
+                return (0, self.halo_x + self.nx), (self.ny_halo, self.nx_halo)
             case "south":
                 return (self.halo_y + self.ny, 0), (self.ny_halo, self.nx_halo)
             case "west":
