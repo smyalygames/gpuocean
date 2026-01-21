@@ -39,6 +39,8 @@ class HIPRandomNumbers(BaseRandomNumbers):
         if array.double_precision:
             hip_check(hiprand.hiprandGenerateNormalDouble(self.generator, pointer, elements, mean, stddev))
         else:
+            # TODO Fix this problem with the HIP kernel crashing
+            raise RuntimeError("Crashes Python for some reason.")
             hip_check(hiprand.hiprandGenerateNormal(self.generator, pointer, elements, mean, stddev))
 
     def fill_uniform(self, array: Array2D, gpu_stream: GPUStream = None):
@@ -53,4 +55,6 @@ class HIPRandomNumbers(BaseRandomNumbers):
         if array.double_precision:
             hip_check(hiprand.hiprandGenerateUniformDouble(self.generator, pointer, elements))
         else:
+            # TODO Fix this problem with the HIP kernel crashing
+            raise RuntimeError("Crashes Python for some reason.")
             hip_check(hiprand.hiprandGenerateUniform(self.generator, pointer, elements))
