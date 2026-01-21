@@ -105,6 +105,7 @@ class MPIWrapper:
                 recv_tag = tag_pad + Direction.EAST
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (west), "
                                   f"shape: {send_west.shape}, send tag: {send_tag} receive tag: {recv_tag}")
+                
                 comm_send.append(self.comm.Isend(send_west, dest=exchange_rank, tag=send_tag))
                 comm_recv.append(self.comm.Irecv(recv_west, source=exchange_rank, tag=recv_tag))
 
@@ -138,7 +139,6 @@ class MPIWrapper:
         Gets the domains to exchange data through MPI.
         """
         return self.sim.gpu_data.arrays
-
 
     def step(self, t_end=0.0):
         self.sim.step(t_end)
