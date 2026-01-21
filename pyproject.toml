@@ -22,7 +22,7 @@ dependencies = [
     "scikit-image",
     "tqdm",
     "hip-python",
-    "amd-cupy",
+    "amd-cupy~=13.5.1",
     "notebook>=7.4.7",
     "scipy-stubs~=1.15.3",
 ]
@@ -30,6 +30,7 @@ dependencies = [
 [tool.uv]
 default-groups = "all"
 no-binary-package = ["mpi4py"]
+#extra-build-variables = { cupy = { CUPY_INSTALL_USE_HIP="1", ROCM_HOME="/opt/rocm", HCC_AMDGPU_TARGET="gfx1030" } }
 
 [tool.uv.sources]
 hip-python = { index = "hip" }

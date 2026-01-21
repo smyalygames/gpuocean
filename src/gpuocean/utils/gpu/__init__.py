@@ -23,7 +23,8 @@ else:
     from .kernels.hip.hip_context import HIPContext as KernelContext
     from .kernels.hip.hip_handler import HIPHandler as GPUHandler
     from .kernels.hip.hip_event import HIPEvent as Event
-    from .kernels.hip.hip_stream import HIPStream as GPUStream
+    # from .kernels.hip.hip_stream import HIPStream as GPUStream
+    from .kernels.cupy.cupy_stream import CuPyStream as GPUStream
     from .utils.hip.hip_random_numbers import HIPRandomNumbers as XORWOWHandler
 
     if TYPE_CHECKING:

@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 import ctypes
 
-import numpy as np
+import cupy as cp
 from hip import hip
+from hip._util import types
 
 from ...hip_utils import hip_check
 from ..handler import BaseGPUHandler
@@ -27,6 +27,8 @@ class HIPHandler(BaseGPUHandler):
                 args[i] = ctypes.c_int32(val)
             elif isinstance(val, float):
                 args[i] = ctypes.c_float(val)
+            elif isinstance(val, cp.cuda.MemoryPointer):
+                args[i] = types.Pointer(val.ptr)
 
         args = tuple(args)
 

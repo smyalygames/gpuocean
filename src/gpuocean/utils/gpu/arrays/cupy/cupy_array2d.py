@@ -4,10 +4,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import cupy as cp
 
-from ...hip_utils import hip_check
-from ..array2d import BaseArray2D
-from .enums import Host, Device, Transfer
-from ...kernels.hip.hip_stream import HIPStream
+from ..array2d import BaseArray2D, direction_t
+from ...kernels.cupy.cupy_stream import CuPyStream
 
 if TYPE_CHECKING:
     from hip._util.types import Pointer
@@ -19,7 +17,7 @@ class CuPyArray2D(BaseArray2D):
     Class that holds 2D HIP data
     """
 
-    def __init__(self, gpu_stream: HIPStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
+    def __init__(self, gpu_stream: CuPyStream, nx: int, ny: int, x_halo: int, y_halo: int, data: data_t,
                  asym_halo: list[int] = None, double_precision=False, integers=False, padded=True):
         """
         Uploads initial data to the HIP device
@@ -32,14 +30,14 @@ class CuPyArray2D(BaseArray2D):
         self.height = shape_y
 
         # Create the array on the device
-        self.data = cp.array(data)
+        self.data: cp.ndarray = cp.asarray(self._host_data)
 
         # FIXME: This could be potentially dangerous as it could be deleting the entire array before the copy has been completed.
         self._host_data = None
 
     @property
     def pointer(self) -> Pointer:
-        return self.data
+        return self.data.data
 
     @property
     def pitch(self):
@@ -48,7 +46,7 @@ class CuPyArray2D(BaseArray2D):
         """
         return self._pitch
 
-    def upload(self, gpu_stream: HIPStream, data: data_t):
+    def upload(self, gpu_stream: CuPyStream, data: data_t):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
 
@@ -61,9 +59,9 @@ class CuPyArray2D(BaseArray2D):
         self._check(host_data.shape, host_data.itemsize)
 
         # Copy data from CPU to GPU
-        self.data = cp.asarray(data)
+        self.data.set(data)
 
-    def copy_buffer(self, gpu_stream: HIPStream, buffer: CuPyArray2D) -> None:
+    def copy_buffer(self, gpu_stream: CuPyStream, buffer: CuPyArray2D) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before copying buffer')
 
@@ -75,7 +73,7 @@ class CuPyArray2D(BaseArray2D):
         # Okay, everything is fine - issue device-to-device-copy:
         self.data = buffer.data
 
-    def download(self, gpu_stream: HIPStream) -> np.ndarray:
+    def download(self, gpu_stream: CuPyStream) -> np.ndarray:
         """
         Enables downloading data from GPU to Python
         Args:
@@ -94,6 +92,12 @@ class CuPyArray2D(BaseArray2D):
         data = cp.asnumpy(self.data)
 
         return data
+
+    def download_boundary(self, gpu_stream: CuPyStream, direction: direction_t) -> data_t:
+        raise NotImplementedError("Need to implement downloading boundaries for CuPy.")
+
+    def upload_boundary(self, gpu_stream: CuPyStream, data: data_t, direction: direction_t) -> None:
+        raise NotImplementedError("Need to implement uploading boundaries for CuPy.")
 
     def release(self) -> None:
         if self.holds_data:

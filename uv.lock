@@ -448,7 +448,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "amd-cupy", index = "https://pypi.amd.com/simple" },
+    { name = "amd-cupy", specifier = "~=13.5.1", index = "https://pypi.amd.com/simple" },
     { name = "gitpython" },
     { name = "hip-python", index = "https://test.pypi.org/simple/" },
     { name = "matplotlib" },
