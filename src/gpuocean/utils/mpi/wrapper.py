@@ -114,7 +114,7 @@ class MPIWrapper:
             for comm in comm_recv:
                 comm.wait()
 
-            print(f"Rank {self.comm.rank} received all data", flush=True)
+            self.logger.debug(f"Rank {self.comm.rank} received all data for transfer {self.step_number}")
 
             # Upload to the array
             if self.exists[Direction.NORTH]:
