@@ -11,12 +11,12 @@ class Coordinate:
     """
     x: int
     y: int
-    nx: ClassVar[int]
-    ny: ClassVar[int]
+    nodes_x: ClassVar[int]
+    nodes_y: ClassVar[int]
     rank: int = field(init=False)
 
     def __post_init__(self):
-        self.rank = (self.y * self.nx) + self.x
+        self.rank = (self.y * self.nodes_x) + self.x
 
 
 class Grid:
@@ -38,13 +38,14 @@ class Grid:
 
         self.domain_nx = nx
         self.domain_ny = ny
-        Coordinate.nx = nx
-        Coordinate.ny = ny
         self.total_nodes = total_nodes
         self.rank = rank
 
         # Subdomain grid size
         self.x, self.y = self._decompose_domain()
+
+        Coordinate.nodes_x = self.x
+        Coordinate.nodes_y = self.y
 
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
