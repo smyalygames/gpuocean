@@ -69,16 +69,19 @@ class SWEDataArakawaA:
 
         return h_cpu, hu_cpu, hv_cpu
 
+    @property
+    def arrays(self) -> tuple[Array2D, Array2D, Array2D, Array2D, Array2D, Array2D]:
+        """
+        Gets all the arrays used in this object.
+        """
+        return self.h0, self.hu0, self.hv0, self.h1, self.hu1, self.hv1
+
     def release(self) -> None:
         """
         Frees the allocated memory buffers on the GPU
         """
-        self.h0.release()
-        self.hu0.release()
-        self.hv0.release()
-        self.h1.release()
-        self.hu1.release()
-        self.hv1.release()
+        for array in self.arrays:
+            array.release()
 
 
 class SWEDataArakawaC:
@@ -146,13 +149,16 @@ class SWEDataArakawaC:
 
         return h_cpu, hu_cpu, hv_cpu
 
+    @property
+    def arrays(self) -> tuple[Array2D, Array2D, Array2D, Array2D, Array2D, Array2D]:
+        """
+        Gets all the arrays used in this object.
+        """
+        return self.h0, self.hu0, self.hv0, self.h1, self.hu1, self.hv1
+
     def release(self) -> None:
         """
         Frees the allocated memory buffers on the GPU
         """
-        self.h0.release()
-        self.hu0.release()
-        self.hv0.release()
-        self.h1.release()
-        self.hu1.release()
-        self.hv1.release()
+        for array in self.arrays:
+            array.release()
