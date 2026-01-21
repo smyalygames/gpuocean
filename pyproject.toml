@@ -21,14 +21,36 @@ dependencies = [
     "gitpython",
     "scikit-image",
     "tqdm",
-    "hip-python >=6.4.4,<7",
+    "hip-python",
+    "amd-cupy",
     "notebook>=7.4.7",
+    "scipy-stubs~=1.15.3",
 ]
+
+[tool.uv]
+default-groups = "all"
+no-binary-package = ["mpi4py"]
 
 [tool.uv.sources]
 hip-python = { index = "hip" }
+amd-cupy = { index = "cupy" }
 
 [[tool.uv.index]]
 name = "hip"
 url = "https://test.pypi.org/simple/"
 explicit = true
+
+[[tool.uv.index]]
+name = "cupy"
+url = "https://pypi.amd.com/simple"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.9.23,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pydevd-pycharm~=253.29346.142",
+]
+
