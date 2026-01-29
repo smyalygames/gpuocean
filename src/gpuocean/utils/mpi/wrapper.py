@@ -1,9 +1,11 @@
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
-from enum import IntEnum, auto
+from typing import TYPE_CHECKING, Literal
+from enum import IntEnum
+from dataclasses import dataclass
 import logging
 
 import numpy as np
+import cupy as cp
 
 from gpuocean.SWEsimulators.Simulator import Simulator
 from gpuocean.utils.gpu import Array2D
@@ -43,15 +45,47 @@ class MPIWrapper:
             Direction.WEST: self.grid.west is not None
         }
 
+        self.exchange_arrays: dict[Array2D, ArrayExchange] = {}
+        self._prepare_exchanges()
+
         self._exchange()
 
     def __getattr__(self, item):
         return getattr(self.sim, item)
 
+    def _prepare_exchanges(self):
+        """
+        Creates buffers for exchanging partial data between arrays.
+        """
+        arrays = self._get_domains()
+        for array in arrays:
+            exchanges = ArrayExchange()
+
+            if self.exists[Direction.NORTH]:
+                buffer = array.download_boundary(self.sim.gpu_stream, "north")
+                exchanges.north = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
+            if self.exists[Direction.EAST]:
+                buffer = array.download_boundary(self.sim.gpu_stream, "east")
+                exchanges.east = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
+            if self.exists[Direction.SOUTH]:
+                buffer = array.download_boundary(self.sim.gpu_stream, "south")
+                exchanges.south = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
+            if self.exists[Direction.WEST]:
+                buffer = array.download_boundary(self.sim.gpu_stream, "west")
+                exchanges.west = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
+
+            self.exchange_arrays[array] = exchanges
+
+        # Remove unused array
+        buffer = None
+
+
     def _exchange(self):
         """
         Completes the MPI exchange for all the arrays.
         """
+        self.sim.gpu_stream.synchronize()
+
         for array in self._get_domains():
             # Prepare the data
             comm_send: list[Request] = []
@@ -60,54 +94,53 @@ class MPIWrapper:
             # Shift by 2 bits
             tag_pad = 4 * self.step_number
 
-            if self.exists[Direction.NORTH]:
-                send_north = array.download_boundary(self.sim.gpu_stream, "north")
-                recv_north = np.empty_like(send_north)
+            # Copy boundary data to buffer
+            self.exchange_arrays[array].prepare_send(array, self.sim.gpu_stream)
 
+            if self.exists[Direction.NORTH]:
                 exchange_rank = self.grid.north.rank
                 send_tag = tag_pad + Direction.NORTH
                 recv_tag = tag_pad + Direction.SOUTH
+                exchange = self.exchange_arrays[array].north
+
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (north), "
-                                  f"shape: {send_north.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
+                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
 
-                comm_send.append(self.comm.Isend(send_north, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(recv_north, source=exchange_rank, tag=recv_tag))
+                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
+                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
             if self.exists[Direction.EAST]:
-                send_east = array.download_boundary(self.sim.gpu_stream, "east")
-                recv_east = np.empty_like(send_east)
-
                 exchange_rank = self.grid.east.rank
                 send_tag = tag_pad + Direction.EAST
                 recv_tag = tag_pad + Direction.WEST
+                exchange = self.exchange_arrays[array].east
+
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (east), "
-                                  f"shape: {send_east.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
+                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
 
-                comm_send.append(self.comm.Isend(send_east, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(recv_east, source=exchange_rank, tag=recv_tag))
+                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
+                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
             if self.exists[Direction.SOUTH]:
-                send_south = array.download_boundary(self.sim.gpu_stream, "south")
-                recv_south = np.empty_like(send_south)
-
                 exchange_rank = self.grid.south.rank
                 send_tag = tag_pad + Direction.SOUTH
                 recv_tag = tag_pad + Direction.NORTH
+                exchange = self.exchange_arrays[array].south
+
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (south), "
-                                  f"shape: {send_south.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
+                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
 
-                comm_send.append(self.comm.Isend(send_south, dest=exchange_rank, tag=tag_pad + Direction.SOUTH))
-                comm_recv.append(self.comm.Irecv(recv_south, source=exchange_rank, tag=recv_tag))
+                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=tag_pad + Direction.SOUTH))
+                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
             if self.exists[Direction.WEST]:
-                send_west = array.download_boundary(self.sim.gpu_stream, "west")
-                recv_west = np.empty_like(send_west)
-
                 exchange_rank = self.grid.west.rank
                 send_tag = tag_pad + Direction.WEST
                 recv_tag = tag_pad + Direction.EAST
+                exchange = self.exchange_arrays[array].west
+
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (west), "
-                                  f"shape: {send_west.shape}, send tag: {send_tag} receive tag: {recv_tag}")
-                
-                comm_send.append(self.comm.Isend(send_west, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(recv_west, source=exchange_rank, tag=recv_tag))
+                                  f"shape: {exchange.send.shape}, send tag: {send_tag} receive tag: {recv_tag}")
+
+                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
+                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
 
             # Do MPI exchange
 
@@ -117,15 +150,7 @@ class MPIWrapper:
 
             self.logger.debug(f"Rank {self.comm.rank} received all data for transfer {self.step_number}")
 
-            # Upload to the array
-            if self.exists[Direction.NORTH]:
-                array.upload_boundary(self.sim.gpu_stream, recv_north, "north")
-            if self.exists[Direction.EAST]:
-                array.upload_boundary(self.sim.gpu_stream, recv_east, "east")
-            if self.exists[Direction.SOUTH]:
-                array.upload_boundary(self.sim.gpu_stream, recv_south, "south")
-            if self.exists[Direction.WEST]:
-                array.upload_boundary(self.sim.gpu_stream, recv_west, "west")
+            self.exchange_arrays[array].upload_received(array, self.sim.gpu_stream)
 
             # Wait for transfers to complete
             for comm in comm_send:
@@ -134,11 +159,11 @@ class MPIWrapper:
             self.logger.debug(f"Rank {self.comm.rank} sent all data for transfer {self.step_number}")
             self.step_number += 1
 
-    def _get_domains(self) -> Iterable[Array2D]:
+    def _get_domains(self) -> list[Array2D]:
         """
         Gets the domains to exchange data through MPI.
         """
-        return self.sim.gpu_data.arrays
+        return list(self.sim.gpu_data.arrays)
 
     def step(self, t_end=0.0):
         self.sim.step(t_end)
@@ -147,6 +172,48 @@ class MPIWrapper:
 
     def cleanUp(self):
         self.sim.cleanUp()
+
+
+@dataclass
+class Exchange:
+    send: cp.ndarray
+    recv: cp.ndarray
+
+
+@dataclass
+class ArrayExchange:
+    north: Exchange | None = None
+    east: Exchange | None = None
+    south: Exchange | None = None
+    west: Exchange | None = None
+
+    def prepare_send(self, array: Array2D, gpu_stream):
+        """
+        Updates the send arrays in each direction if there is one defined.
+        """
+        if self.north is not None:
+            self.north.send = array.download_boundary(gpu_stream, "north")
+        if self.east is not None:
+            self.east.send = array.download_boundary(gpu_stream, "east")
+        if self.south is not None:
+            self.south.send = array.download_boundary(gpu_stream, "south")
+        if self.west is not None:
+            self.west.send = array.download_boundary(gpu_stream, "west")
+
+        gpu_stream.synchronize()
+
+    def upload_received(self, array: Array2D, gpu_stream):
+        """
+        Updates the array with all the received boundary data.
+        """
+        if self.north is not None:
+            array.upload_boundary(gpu_stream, self.north.recv, "north")
+        if self.east is not None:
+            array.upload_boundary(gpu_stream, self.east.recv, "east")
+        if self.south is not None:
+            array.upload_boundary(gpu_stream, self.south.recv, "south")
+        if self.west is not None:
+            array.upload_boundary(gpu_stream, self.west.recv, "west")
 
 
 class Direction(IntEnum):

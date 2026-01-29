@@ -86,18 +86,31 @@ class CuPyArray2D(BaseArray2D):
         if not self.holds_data:
             raise RuntimeError('HIP buffer has been freed')
 
-        data = np.zeros(self.shape, dtype=self.dtype)
-
-        # Parameters to copy from GPU memory
+        # Convert cupy array to numpy array
         data = cp.asnumpy(self.data)
 
         return data
 
     def download_boundary(self, gpu_stream: CuPyStream, direction: direction_t) -> data_t:
+        if not self.holds_data:
+            raise RuntimeError('CuPy buffer has been freed.')
+
+        start, end = self._get_boundary_coordinates(direction)
+        # shape = self._get_boundary_shape(direction)
+
+        return self.data[start[0]:end[0], start[1]:end[1]]
         raise NotImplementedError("Need to implement downloading boundaries for CuPy.")
 
-    def upload_boundary(self, gpu_stream: CuPyStream, data: data_t, direction: direction_t) -> None:
-        raise NotImplementedError("Need to implement uploading boundaries for CuPy.")
+    def upload_boundary(self, gpu_stream: CuPyStream, data: CuPyArray2D, direction: direction_t) -> None:
+        start, end = self._get_boundary_coordinates(direction)
+        shape = self._get_boundary_shape(direction)
+
+        # Check that the shape is correct
+        if data.shape != shape:
+            raise ValueError(f"The shape of the boundary data is not correct. Expected shape: {shape};"
+                             f" Shape of passed data: {data.shape}.")
+
+        self.data[start[0]:end[0], start[1]:end[1]] = data
 
     def release(self) -> None:
         if self.holds_data:
