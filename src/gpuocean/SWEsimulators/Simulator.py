@@ -307,6 +307,20 @@ class Simulator(ABC):
 
         return atmospheric_pressure_t
 
+    @property
+    def arrays(self) -> list[Array2D]:
+        """
+        All the GPU arrays used for the simulation.
+        """
+        return list(self.gpu_data.arrays) + [
+            self.wind_stress_x_current_arr,
+            self.wind_stress_y_current_arr,
+            self.wind_stress_x_next_arr,
+            self.wind_stress_y_next_arr,
+            self.atmospheric_pressure_current_arr,
+            self.atmospheric_pressure_next_arr
+        ]
+
     @abstractmethod
     def step(self, t_end=0.0):
         """

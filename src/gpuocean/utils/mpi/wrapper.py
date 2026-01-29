@@ -79,7 +79,6 @@ class MPIWrapper:
         # Remove unused array
         buffer = None
 
-
     def _exchange(self):
         """
         Completes the MPI exchange for all the arrays.
@@ -163,7 +162,7 @@ class MPIWrapper:
         """
         Gets the domains to exchange data through MPI.
         """
-        return list(self.sim.gpu_data.arrays)
+        return self.sim.arrays
 
     def step(self, t_end=0.0):
         self.sim.step(t_end)

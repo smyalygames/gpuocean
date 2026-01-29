@@ -380,6 +380,24 @@ class CDKLM16(Simulator.Simulator):
         if self.dt <= 0:
             self.updateDt()
 
+    @property
+    def arrays(self) -> list[Array2D]:
+        array = super().arrays
+
+        array += [
+            self.coriolis_f_arr,
+            self.angle_arr
+        ]
+
+        if self.reportGeostrophicEquilibrium:
+            array += [
+                self.geoEq_uxpvy,
+                self.geoEq_Kx,
+                self.geoEq_Ly
+            ]
+
+        return array
+
     def cleanUp(self, do_gc=True):
         """
         Clean up function
