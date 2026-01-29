@@ -98,8 +98,21 @@ class CuPyArray2D(BaseArray2D):
         start, end = self._get_boundary_coordinates(direction)
         # shape = self._get_boundary_shape(direction)
 
-        return self.data[start[0]:end[0], start[1]:end[1]]
-        raise NotImplementedError("Need to implement downloading boundaries for CuPy.")
+        # FIXME add checks to make sure this does not overflow
+        if direction == "north":
+            start = (start[0] + self.halo_y, start[1])
+            end = (end[0] + self.halo_y, end[1])
+        if direction == "east":
+            start = (start[0], start[1] - self.halo_x)
+            end = (end[0], end[1] - self.halo_x)
+        if direction == "south":
+            start = (start[0] - self.halo_y, start[1])
+            end = (end[0] - self.halo_y, end[1])
+        if direction == "west":
+            start = (start[0], start[1] + self.halo_x)
+            end = (end[0], end[1] + self.halo_x)
+
+        return self.data[start[0]:end[0], start[1]:end[1]].copy()
 
     def upload_boundary(self, gpu_stream: CuPyStream, data: CuPyArray2D, direction: direction_t) -> None:
         start, end = self._get_boundary_coordinates(direction)
