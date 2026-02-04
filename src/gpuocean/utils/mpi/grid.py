@@ -26,6 +26,9 @@ class Grid:
 
     global_nx: int
     global_ny: int
+    # Decomposition of all nodes in dimensions
+    nodes_x: int
+    nodes_y: int
     # Position of local domain on global domain
     x_pos: int
     y_pos: int
@@ -44,21 +47,21 @@ class Grid:
         :param rank: Rank of this current process.
         """
 
-        self.global_nx = nx
-        self.global_ny = ny
+        Grid.global_nx = nx
+        Grid.global_ny = ny
         self.total_nodes = total_nodes
         self.rank = rank
 
         # Subdomain grid size
-        self.nodes_x, self.nodes_y = self._decompose_domain()
+        Grid.nodes_x, Grid.nodes_y = self._decompose_domain()
 
         Coordinate.nodes_x = self.nodes_x
         Coordinate.nodes_y = self.nodes_y
 
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
-        self.x_pos = self.location.x
-        self.y_pos = self.location.y
+        Grid.x_pos = self.location.x
+        Grid.y_pos = self.location.y
 
         # Calculate the size of the local subdomain
         self.local_nx, self.local_ny = self._calculate_subdomain_size(self.location.x, self.location.y)
@@ -66,8 +69,8 @@ class Grid:
         # Provide the coordinates of the domain relative to the global domain
         # TODO replace nx with global nx, or have something to determine the type of domain decomposition
         global_coordinates = self._calculate_global_coordinates()
-        self.x0, self.x1 = global_coordinates[0]
-        self.y0, self.y1 = global_coordinates[1]
+        Grid.x0, Grid.x1 = global_coordinates[0]
+        Grid.y0, Grid.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
         self.north = self.get_neighbor("north")
