@@ -57,7 +57,7 @@ class MPIWrapper:
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
         # Decompose the information
-        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny})
+        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm})
 
         original_shape = (global_ny + ghost_cells[0] + ghost_cells[2], global_nx + ghost_cells[1] + ghost_cells[3])
         shape = (self.grid.local_ny + ghost_cells[0] + ghost_cells[2],
@@ -233,9 +233,18 @@ class MPIWrapper:
         return self.sim.arrays
 
     def step(self, t_end=0.0):
-        self.sim.step(t_end)
-        self.step_number += 1
-        self._exchange()
+        t_now = 0.0
+
+        if t_end == 0:
+            self.sim.step(t_end)
+            self.step_number += 1
+            self._exchange()
+
+        while t_now < t_end:
+            t_now += self.sim.dt
+            self.sim.step(t_now)
+            self.step_number += 1
+            self._exchange()
 
     def cleanUp(self):
         self.sim.cleanUp()
