@@ -1,19 +1,24 @@
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Literal
-from enum import IntEnum
+from typing import TYPE_CHECKING
+from enum import Enum, IntEnum
 from dataclasses import dataclass
 import logging
 
 import numpy as np
 import cupy as cp
+from mpi4py import MPI
 
-from gpuocean.SWEsimulators.Simulator import Simulator
+from gpuocean.SWEsimulators.CDKLM16 import CDKLM16
 from gpuocean.utils.gpu import Array2D
 
 from .grid import Grid
 
 if TYPE_CHECKING:
     from mpi4py.MPI import Request
+    from gpuocean.SWEsimulators.Simulator import Simulator
+
+
+class SimulatorType(Enum):
+    CDKLM16 = CDKLM16
 
 
 class MPIWrapper:
@@ -21,18 +26,81 @@ class MPIWrapper:
     An MPI wrapper for the SWE simulator schemes.
     """
 
-    def __init__(self, sim: Simulator):
+    _sim_types = {
+        'CDKLM16'
+    }
+
+    def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
+                 ghost_cells: tuple[int, int, int, int],
+                 comm=MPI.COMM_WORLD, *args, **kwargs):
+        """
+        Creates a wrapper for the simulator, and the simulator chosen.
+        :param simulator_type: Simulator type to create from the given arguments.
+        :param global_nx: Size of the global domain in the x-axis.
+        :param global_ny: Size of the global domain in the y-axis.
+        :param ghost_cells: A tuple consisting of the number of ghost cells in the directions of (north, east, south, west).
+        :param comm: MPI interface.
+        :param args: Positional arguments for the specified simulator.
+        :param kwargs: Keyword arguments for the specified simulator.
+        """
         self.logger = logging.getLogger(__name__)
-        self.comm = sim.comm
+        self.comm = comm
         total_nodes = self.comm.size
         rank = self.comm.rank
 
         self.logger.info(f"Rank: {rank}, Total Ranks: {total_nodes}.")
 
-        # FIXME change this so that it does not use the pre-existing simulator,
-        #   and initializes a simulator.
-        self.sim = sim
-        self.grid = Grid(sim.nx, sim.ny, total_nodes, rank)
+        self.global_nx = global_nx
+        self.global_ny = global_ny
+        self.grid = Grid(global_nx, global_ny, total_nodes, rank)
+        self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
+                          f"from global domain size ({self.global_nx}, {self.global_ny}).")
+
+        # Decompose the information
+        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny})
+
+        original_shape = (global_ny + ghost_cells[0] + ghost_cells[2], global_nx + ghost_cells[1] + ghost_cells[3])
+        shape = (self.grid.local_ny + ghost_cells[0] + ghost_cells[2],
+                 self.grid.local_nx + ghost_cells[1] + ghost_cells[3])
+
+        # Calculate locations to splice the array
+        if self.grid.y_pos == 0:
+            splice_y0 = 0
+            splice_y1 = self.grid.y1 + ghost_cells[0] + ghost_cells[2]
+        else:
+            splice_y0 = self.grid.y0 - ghost_cells[0]
+            splice_y1 = self.grid.y1 + ghost_cells[2]
+        if self.grid.x_pos == 0:
+            splice_x0 = 0
+            splice_x1 = self.grid.x1 + ghost_cells[1] + ghost_cells[3]
+        else:
+            splice_x0 = self.grid.x0 - ghost_cells[1]
+            splice_x1 = self.grid.x1 + ghost_cells[3]
+
+        self.logger.debug(f"Splicing arrays with [{splice_y0}:{splice_y1}, {splice_x0}:{splice_x1}].")
+
+        # Go through arrays in args
+        args = list(args)
+        for i in range(len(args)):
+            var = args[i]
+            if isinstance(var, np.ndarray):
+                if var.shape == original_shape:
+                    args[i] = var[splice_y0:splice_y1, splice_x0:splice_x1]
+                elif var.shape == (original_shape[0] + 1, original_shape[1] + 1):
+                    args[i] = var[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
+
+        args = tuple(args)
+
+        # Go through arrays in kwargs
+        for key, value in kwargs.items():
+            if isinstance(value, np.ndarray):
+                if value.shape == original_shape:
+                    kwargs[key] = value[splice_y0:splice_y1, splice_x0:splice_x1]
+                elif value.shape == (original_shape[0] + 1, original_shape[1] + 1):
+                    kwargs[key] = value[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
+
+        # Create the simulator
+        self.sim: Simulator = simulator_type.value(*args, **kwargs)
 
         self.step_number = 0
 

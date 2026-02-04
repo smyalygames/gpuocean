@@ -24,8 +24,16 @@ class Grid:
     Creates a grid that is a decomposition of the domain.
     """
 
-    domain_nx: int
-    domain_ny: int
+    global_nx: int
+    global_ny: int
+    # Position of local domain on global domain
+    x_pos: int
+    y_pos: int
+    # Global domain coordinates
+    x0: int
+    x1: int
+    y0: int
+    y1: int
 
     def __init__(self, nx: int, ny: int, total_nodes: int, rank: int):
         """
@@ -36,22 +44,30 @@ class Grid:
         :param rank: Rank of this current process.
         """
 
-        self.domain_nx = nx
-        self.domain_ny = ny
+        self.global_nx = nx
+        self.global_ny = ny
         self.total_nodes = total_nodes
         self.rank = rank
 
         # Subdomain grid size
-        self.x, self.y = self._decompose_domain()
+        self.nodes_x, self.nodes_y = self._decompose_domain()
 
-        Coordinate.nodes_x = self.x
-        Coordinate.nodes_y = self.y
+        Coordinate.nodes_x = self.nodes_x
+        Coordinate.nodes_y = self.nodes_y
 
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
+        self.x_pos = self.location.x
+        self.y_pos = self.location.y
 
         # Calculate the size of the local subdomain
-        self.nx, self.ny = self._calculate_subdomain_size()
+        self.local_nx, self.local_ny = self._calculate_subdomain_size(self.location.x, self.location.y)
+
+        # Provide the coordinates of the domain relative to the global domain
+        # TODO replace nx with global nx, or have something to determine the type of domain decomposition
+        global_coordinates = self._calculate_global_coordinates()
+        self.x0, self.x1 = global_coordinates[0]
+        self.y0, self.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
         self.north = self.get_neighbor("north")
@@ -84,7 +100,7 @@ class Grid:
         best_perimeter: int | float = math.inf
 
         for pair in factors:
-            perimeter = (self.domain_nx * (pair[0] - 1)) + (self.domain_ny * (pair[1] - 1))
+            perimeter = (self.global_nx * (pair[0] - 1)) + (self.global_ny * (pair[1] - 1))
             if perimeter < best_perimeter:
                 best = pair
                 best_perimeter = perimeter
@@ -96,31 +112,51 @@ class Grid:
         Calculate the coordinate for the rank of this process.
         :returns: This rank's coordinates, with indexing starting at 0.
         """
-        y = self.rank // self.x
-        x = self.rank % self.x
+        y = self.rank // self.nodes_x
+        x = self.rank % self.nodes_x
 
         # Checks that the coordinates are sane.
-        if y > self.y - 1:
+        if y > self.nodes_y - 1:
             raise RuntimeError("Processed y-coordinate in grid is out of bounds.")
-        if x > self.x - 1:
+        if x > self.nodes_x - 1:
             raise RuntimeError("Processed x-coordinate in grid is out of bounds.")
 
         coordinates = Coordinate(x, y)
 
         return coordinates
 
-    def _calculate_subdomain_size(self) -> tuple[int, int]:
+    def _calculate_global_coordinates(self):
+        """
+        Calculates the edge coordinates of this subdomain in relation to the global domain.
+        """
+        start_x = 0
+        start_y = 0
+        # Calculate x-axis start position
+        for x in range(self.location.x):
+            start_x += self._calculate_subdomain_size(x, self.location.y)[0]
+        # Calculate y-axis start position
+        for y in range(self.location.y):
+            start_y += self._calculate_subdomain_size(self.location.x, y)[1]
+
+        end_x = start_x + self.local_nx
+        end_y = start_y + self.local_ny
+
+        return (start_x, end_x), (start_y, end_y)
+
+    def _calculate_subdomain_size(self, x_pos: int, y_pos: int) -> tuple[int, int]:
         """
         Calculates the size of the subdomain,
         taking into account divisions with remainders from the original domain.
+        :param x_pos: Position of the node in relation to the other nodes globally in the x-axis.
+        :param y_pos: Position of the node in relation to the other nodes globally in the y-axis.
         :returns: Size of the subdomain in the x- and y-axis respectively.
         """
-        x_remainder = (self.domain_nx - self.location.x) % self.x
-        y_remainder = (self.domain_ny - self.location.y) % self.y
+        x_remainder = (self.global_nx - x_pos) % self.nodes_x
+        y_remainder = (self.global_ny - y_pos) % self.nodes_y
 
         # Calculate the size of the subdomain
-        nx = self.domain_nx / self.x
-        ny = self.domain_ny / self.y
+        nx = self.global_nx / self.nodes_x
+        ny = self.global_ny / self.nodes_y
 
         # Account for decimals
         if x_remainder == 0:
@@ -146,7 +182,7 @@ class Grid:
             case "north":
                 new_y = self.location.y + 1
                 # Check if the new y location goes out of bounds of the grid
-                if new_y >= self.y:
+                if new_y >= self.nodes_y:
                     return None
 
                 return Coordinate(self.location.x, new_y)
@@ -160,7 +196,7 @@ class Grid:
             case "east":
                 new_x = self.location.x + 1
                 # Check if the new x location goes out of bounds of the grid
-                if new_x >= self.x:
+                if new_x >= self.nodes_x:
                     return None
 
                 return Coordinate(new_x, self.location.y)
