@@ -268,13 +268,13 @@ class ArrayExchange:
         Updates the send arrays in each direction if there is one defined.
         """
         if self.north is not None:
-            self.north.send = array.download_boundary(gpu_stream, "north")
+            self.north.send = array.download_boundary(gpu_stream, "south")
         if self.east is not None:
-            self.east.send = array.download_boundary(gpu_stream, "east")
+            self.east.send = array.download_boundary(gpu_stream, "west")
         if self.south is not None:
-            self.south.send = array.download_boundary(gpu_stream, "south")
+            self.south.send = array.download_boundary(gpu_stream, "north")
         if self.west is not None:
-            self.west.send = array.download_boundary(gpu_stream, "west")
+            self.west.send = array.download_boundary(gpu_stream, "east")
 
         gpu_stream.synchronize()
 
@@ -283,13 +283,13 @@ class ArrayExchange:
         Updates the array with all the received boundary data.
         """
         if self.north is not None:
-            array.upload_boundary(gpu_stream, self.north.recv, "north")
+            array.upload_boundary(gpu_stream, self.north.recv, "south")
         if self.east is not None:
-            array.upload_boundary(gpu_stream, self.east.recv, "east")
+            array.upload_boundary(gpu_stream, self.east.recv, "west")
         if self.south is not None:
-            array.upload_boundary(gpu_stream, self.south.recv, "south")
+            array.upload_boundary(gpu_stream, self.south.recv, "north")
         if self.west is not None:
-            array.upload_boundary(gpu_stream, self.west.recv, "west")
+            array.upload_boundary(gpu_stream, self.west.recv, "east")
 
 
 class Direction(IntEnum):
