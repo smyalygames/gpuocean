@@ -9,6 +9,7 @@ from mpi4py import MPI
 
 from gpuocean.SWEsimulators.CDKLM16 import CDKLM16
 from gpuocean.utils.gpu import Array2D
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 
 from .grid import Grid
 
@@ -56,8 +57,17 @@ class MPIWrapper:
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
+        # Create boundary conditions
+        # TODO figure out why this works by using an undefined boundary condition
+        boundary_conditions = BoundaryConditions(
+            north=0,
+            east=0,
+            south=0,
+            west=0
+        )
+
         # Decompose the information
-        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm})
+        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm, 'boundary_conditions': boundary_conditions})
 
         original_shape = (global_ny + ghost_cells[0] + ghost_cells[2], global_nx + ghost_cells[1] + ghost_cells[3])
         shape = (self.grid.local_ny + ghost_cells[0] + ghost_cells[2],
@@ -236,15 +246,15 @@ class MPIWrapper:
         t_now = 0.0
 
         if t_end == 0:
+            self._exchange()
             self.sim.step(t_end)
             self.step_number += 1
-            self._exchange()
 
         while t_now < t_end:
             t_now += self.sim.dt
+            self._exchange()
             self.sim.step(t_now)
             self.step_number += 1
-            self._exchange()
 
     def cleanUp(self):
         self.sim.cleanUp()
