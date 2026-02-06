@@ -9,7 +9,7 @@ import cupy as cp
 from mpi4py import MPI
 
 from gpuocean.utils.gpu import Array2D
-from gpuocean.utils.Common import BoundaryConditions
+from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 
 from .grid import Grid
 
@@ -23,10 +23,6 @@ class MPIWrapper:
     """
     An MPI wrapper for the SWE simulator schemes.
     """
-
-    _sim_types = {
-        'CDKLM16'
-    }
 
     def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
                  ghost_cells: tuple[int, int, int, int],
@@ -57,10 +53,10 @@ class MPIWrapper:
         # Create boundary conditions
         # TODO figure out why this works by using an undefined boundary condition
         boundary_conditions = BoundaryConditions(
-            north=0,
-            east=0,
-            south=0,
-            west=0
+            north=BoundaryType.DIRICHLET,
+            east=BoundaryType.DIRICHLET,
+            south=BoundaryType.DIRICHLET,
+            west=BoundaryType.DIRICHLET
         )
 
         # Decompose the information

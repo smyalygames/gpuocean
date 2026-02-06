@@ -258,6 +258,7 @@ def deprecated(func):
     return new_func
 
 class BoundaryType(IntEnum):
+    DIRICHLET = 0
     WALL = 1
     PERIODIC = 2
     FLOW_RELAXATION_SCHEME = 3
