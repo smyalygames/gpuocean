@@ -70,14 +70,14 @@ class NetCDFtest(unittest.TestCase):
             'write_netcdf': True,
             'netcdf_filename': 'netcdf_test/netcdf_test.nc'
         }
-        self.sim = CDKLM16.CDKLM16(**doubleJetCase_args, **doubleJetCase_init, **netcdf_args)
+        self.sim = CDKLM16(**doubleJetCase_args, **doubleJetCase_init, **netcdf_args)
         self.sim.setSOARModelError(**model_error_args)
         self.sim.closeNetCDF()
         print("Done setup")
         
         
         # Create new simulator from the newly created file
-        self.file_sim = CDKLM16.CDKLM16.fromfilename(self.gpu_ctx, netcdf_args['netcdf_filename'], cont_write_netcdf=False)
+        self.file_sim = CDKLM16.fromfilename(self.gpu_ctx, netcdf_args['netcdf_filename'], cont_write_netcdf=False)
         print("Created from file")
         self.file_sim.setModelErrorFromFile(netcdf_args['netcdf_filename'])
         print("Set model error from file")

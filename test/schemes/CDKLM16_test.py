@@ -153,7 +153,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -171,7 +171,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -187,7 +187,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -206,7 +206,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=2)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -223,7 +223,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=2)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -239,7 +239,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=2)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -258,7 +258,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=3)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -275,7 +275,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=3)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -296,7 +296,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=3)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -314,7 +314,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=4)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -331,7 +331,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=4)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -347,7 +347,7 @@ class CDKLM16test(unittest.TestCase):
         self.setBoundaryConditions(bc_settings=4)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -365,7 +365,7 @@ class CDKLM16test(unittest.TestCase):
         self.allocData()
         self.f = 0.01
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -387,7 +387,7 @@ class CDKLM16test(unittest.TestCase):
         self.f = 0.01 + 2*beta*self.dy
         
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,
@@ -406,7 +406,7 @@ class CDKLM16test(unittest.TestCase):
         self.allocData() 
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
         makeBottomTopography(self.Hi, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.eta0, self.u0, self.v0, self.Hi,
                                    self.nx, self.ny,
                                    self.dx, self.dy, self.dt,

@@ -1,2 +1,2 @@
 from .grid import Grid, Coordinate
-from .wrapper import MPIWrapper, SimulatorType
+from .wrapper import MPIWrapper

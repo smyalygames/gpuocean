@@ -167,7 +167,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -188,7 +188,7 @@ class KP07test(unittest.TestCase):
         self.Hi = self.Hi - extraBottom
         self.eta0 = self.eta0 + extraBottom
 
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -206,7 +206,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -222,7 +222,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -239,7 +239,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions()
         self.allocData()
         self.Hi = self.Hi + 10.0
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -254,7 +254,7 @@ class KP07test(unittest.TestCase):
         self.allocData()
         makeBathymetryCrater(self.Bi, self.nx + 1, self.ny + 1, self.dx, self.dy, self.ghosts)
         self.Hi += self.Bi
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -269,7 +269,7 @@ class KP07test(unittest.TestCase):
         self.allocData()
         makeBathymetryCrazyness(self.Bi, self.nx + 1, self.ny + 1, self.dx, self.dy, self.ghosts)
         self.Hi += self.Bi
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -285,7 +285,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=2)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -301,7 +301,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=2)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -317,7 +317,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=2)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -335,7 +335,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=3)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -351,7 +351,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=3)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -367,7 +367,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=3)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -385,7 +385,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=4)
         self.allocData()
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -401,7 +401,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=4)
         self.allocData()
         addCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -417,7 +417,7 @@ class KP07test(unittest.TestCase):
         self.setBoundaryConditions(bcSettings=4)
         self.allocData()
         addUpperCornerBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,
@@ -434,7 +434,7 @@ class KP07test(unittest.TestCase):
         self.allocData()
         self.f = 0.01
         addCentralBump(self.eta0, self.nx, self.ny, self.dx, self.dy, self.validDomain)
-        self.sim = KP07.KP07(self.gpu_ctx,
+        self.sim = KP07(self.gpu_ctx,
                              self.eta0, self.Hi, self.u0, self.v0,
                              self.nx, self.ny,
                              self.dx, self.dy, self.dt,

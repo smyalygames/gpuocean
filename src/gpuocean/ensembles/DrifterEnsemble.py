@@ -49,7 +49,7 @@ class DrifterEnsemble(BaseDrifterEnsemble):
     # ---------------------------------------
     def init(self):
 
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx,
+        self.sim = CDKLM16(self.gpu_ctx,
                                    self.base_eta, self.base_hu, self.base_hv,
                                    self.base_H,
                                    self.nx, self.ny, self.dx, self.dy, self.dt,

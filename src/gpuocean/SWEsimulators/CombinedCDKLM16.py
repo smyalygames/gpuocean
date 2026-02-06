@@ -56,7 +56,7 @@ class CombinedCDKLM16:
     - one sim for baroclinic model
     """
 
-    def __init__(self, barotropic_sim: CDKLM16.CDKLM16, baroclinic_sim: CDKLM16.CDKLM16):
+    def __init__(self, barotropic_sim: CDKLM16, baroclinic_sim: CDKLM16):
 
         self.logger = logging.getLogger(__name__)
 
@@ -183,7 +183,7 @@ class CombinedCDKLM16:
         """
 
         if sim_flags["barotropic"]:
-            barotropic_sim = CDKLM16.CDKLM16(barotropic_gpu_ctx,
+            barotropic_sim = CDKLM16(barotropic_gpu_ctx,
                                              barotropic_eta0, barotropic_hu0, barotropic_hv0, barotropic_H,
                                              nx, ny,
                                              dx, dy, dt,
@@ -222,7 +222,7 @@ class CombinedCDKLM16:
 
         baroclinic_sim = None
         if sim_flags["baroclinic"]:
-            baroclinic_sim = CDKLM16.CDKLM16(baroclinic_gpu_ctx,
+            baroclinic_sim = CDKLM16(baroclinic_gpu_ctx,
                                              baroclinic_eta0, baroclinic_hu0, baroclinic_hv0, baroclinic_H,
                                              nx, ny,
                                              dx, dy, dt,

@@ -189,7 +189,7 @@ class RealisticForcingTest(unittest.TestCase):
     # Lake at rest - no atm pressure or wind
 
     def test_steady_state_lake_at_rest(self):
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         self.sim.step(3600)
         self.check_steady_state()
 
@@ -228,25 +228,25 @@ class RealisticForcingTest(unittest.TestCase):
 
     def test_steady_state_linear_x(self):
         self.setLinearXP()
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         self.sim.step(3600)
         self.check_steady_state(places=3)
 
     def test_steady_state_linear_y(self):
         self.setLinearYP()
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         self.sim.step(3600)
         self.check_steady_state(places=3)
 
     def test_steady_state_linear_diag(self):
         self.setLinearDiagP()
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         self.sim.step(3600)
         self.check_steady_state(places=2)
 
     def test_steady_state_bumps(self):
         self.setBumpyP()
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         self.sim.step(3600)
         self.check_steady_state(places=2)
 
@@ -255,7 +255,7 @@ class RealisticForcingTest(unittest.TestCase):
 
     def test_create_steady_state_linear_x(self):
         self.setLinearXP(balanced_eta=False, temporal_a=0, temporal_b=12)
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(3600):
             self.sim.step(24)
         self.setLinearXP(balanced_eta=True)
@@ -263,7 +263,7 @@ class RealisticForcingTest(unittest.TestCase):
 
     def test_create_steady_state_linear_y(self):
         self.setLinearYP(balanced_eta=False, temporal_a=0, temporal_b=12)
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(3600):
             self.sim.step(24)
         self.setLinearYP(balanced_eta=True)
@@ -271,7 +271,7 @@ class RealisticForcingTest(unittest.TestCase):
 
     def test_create_steady_state_linear_diag(self):
         self.setLinearDiagP(balanced_eta=False, temporal_a=0, temporal_b=12)
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(3600):
             self.sim.step(24)
         self.setLinearDiagP(balanced_eta=True)
@@ -282,7 +282,7 @@ class RealisticForcingTest(unittest.TestCase):
         self.numPressures = 20
         self.setBumpyP(temporal_a=-10, temporal_b=10)
         self.init_args["eta0"] *= -1
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(3600):
             self.sim.step(24)
         self.setBumpyP()
@@ -293,7 +293,7 @@ class RealisticForcingTest(unittest.TestCase):
     def test_different_number_of_linear_textures(self):
         self.numPressures = 100
         self.setLinearDiagP(balanced_eta=False, temporal_a=0, temporal_b=12)
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(360):
             self.sim.step(24)
         eta1, hu1, hv1 = self.sim.download(interior_domain_only=True)
@@ -302,7 +302,7 @@ class RealisticForcingTest(unittest.TestCase):
         self.numPressures = 2
         self.p_atm = np.ones(self.dataShape, dtype=np.float32)*self.p_atm_0
         self.setLinearDiagP(balanced_eta=False, temporal_a=0, temporal_b=12)
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(360):
             self.sim.step(24)
         eta2, hu2, hv2 = self.sim.download(interior_domain_only=True)
@@ -320,7 +320,7 @@ class RealisticForcingTest(unittest.TestCase):
         # To investigate bug, see following notebook:
         # https://github.com/havahol/miscGPUOcean/blob/360848153609c2aefe8997dcac72884ecfca2d5f/atmospheric-pressure/WindTextureCheck.ipynb
         self.setLinearWindY()
-        self.sim = CDKLM16.CDKLM16(**self.sim_args, **self.init_args)
+        self.sim = CDKLM16(**self.sim_args, **self.init_args)
         for i in range(360):
             self.sim.step(24)
         eta, hu, hv = self.sim.download(interior_domain_only=True)

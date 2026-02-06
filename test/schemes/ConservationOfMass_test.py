@@ -122,14 +122,14 @@ class ConservationOfMassTest(unittest.TestCase):
         
         accuracy = 5
         if sim_name == "FBL":
-            self.sim = FBL.FBL(**self.sim_args, **init_args)
+            self.sim = FBL(**self.sim_args, **init_args)
             accuracy = 3
         elif sim_name == "CTCS":
-            self.sim = CTCS.CTCS(**self.sim_args, **init_args, **self.ctcs_args)
+            self.sim = CTCS(**self.sim_args, **init_args, **self.ctcs_args)
         elif sim_name == "KP":
-            self.sim = KP07.KP07(**self.sim_args, **init_args)
+            self.sim = KP07(**self.sim_args, **init_args)
         elif sim_name == "CDKLM":
-            self.sim = CDKLM16.CDKLM16(**self.sim_args, **init_args)
+            self.sim = CDKLM16(**self.sim_args, **init_args)
         
         for k in range(self.T):
             if k > 0:

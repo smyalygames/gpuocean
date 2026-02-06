@@ -1,5 +1,6 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
-from enum import Enum, IntEnum
+from enum import IntEnum
 from dataclasses import dataclass
 import logging
 
@@ -7,19 +8,15 @@ import numpy as np
 import cupy as cp
 from mpi4py import MPI
 
-from gpuocean.SWEsimulators.CDKLM16 import CDKLM16
 from gpuocean.utils.gpu import Array2D
-from gpuocean.utils.Common import BoundaryConditions, BoundaryType
+from gpuocean.utils.Common import BoundaryConditions
 
 from .grid import Grid
 
 if TYPE_CHECKING:
     from mpi4py.MPI import Request
+    from gpuocean.SWEsimulators import SimulatorType
     from gpuocean.SWEsimulators.Simulator import Simulator
-
-
-class SimulatorType(Enum):
-    CDKLM16 = CDKLM16
 
 
 class MPIWrapper:
@@ -240,13 +237,11 @@ class MPIWrapper:
         if t_end == 0:
             self._exchange()
             self.sim.step(t_end)
-            self.step_number += 1
 
         while t_now < t_end:
             t_now += self.sim.dt
             self._exchange()
             self.sim.step(t_now)
-            self.step_number += 1
 
     def cleanUp(self):
         self.sim.cleanUp()
