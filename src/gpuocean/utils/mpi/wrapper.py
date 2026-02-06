@@ -69,23 +69,15 @@ class MPIWrapper:
         # Decompose the information
         kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm, 'boundary_conditions': boundary_conditions})
 
-        original_shape = (global_ny + ghost_cells[0] + ghost_cells[2], global_nx + ghost_cells[1] + ghost_cells[3])
-        shape = (self.grid.local_ny + ghost_cells[0] + ghost_cells[2],
-                 self.grid.local_nx + ghost_cells[1] + ghost_cells[3])
+        x_ghost_cells = ghost_cells[1] + ghost_cells[3]
+        y_ghost_cells = ghost_cells[0] + ghost_cells[2]
 
-        # Calculate locations to splice the array
-        if self.grid.y_pos == 0:
-            splice_y0 = 0
-            splice_y1 = self.grid.y1 + ghost_cells[0] + ghost_cells[2]
-        else:
-            splice_y0 = self.grid.y0 - ghost_cells[0]
-            splice_y1 = self.grid.y1 + ghost_cells[2]
-        if self.grid.x_pos == 0:
-            splice_x0 = 0
-            splice_x1 = self.grid.x1 + ghost_cells[1] + ghost_cells[3]
-        else:
-            splice_x0 = self.grid.x0 - ghost_cells[1]
-            splice_x1 = self.grid.x1 + ghost_cells[3]
+        original_shape = (global_ny + y_ghost_cells, global_nx + x_ghost_cells)
+
+        splice_x0 = self.grid.x0
+        splice_x1 = self.grid.x1 + x_ghost_cells
+        splice_y0 = self.grid.y0
+        splice_y1 = self.grid.y1 + y_ghost_cells
 
         self.logger.debug(f"Splicing arrays with [{splice_y0}:{splice_y1}, {splice_x0}:{splice_x1}].")
 
