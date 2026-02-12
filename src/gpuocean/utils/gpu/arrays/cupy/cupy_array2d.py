@@ -26,7 +26,6 @@ class CuPyArray2D(BaseArray2D):
         super().__init__(gpu_stream, nx, ny, x_halo, y_halo, data, asym_halo, double_precision, integers)
         shape_y, shape_x = self.shape
 
-        self._pitch = shape_x * self.bytes_per_float
         self.height = shape_y
 
         # Create the array on the device
@@ -44,7 +43,7 @@ class CuPyArray2D(BaseArray2D):
         """
         Pitch in the device memory.
         """
-        return self._pitch
+        return self.data.strides[0]
 
     def upload(self, gpu_stream: CuPyStream, data: data_t):
         if not self.holds_data:
