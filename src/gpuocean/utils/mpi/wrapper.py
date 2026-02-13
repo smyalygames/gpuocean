@@ -26,7 +26,7 @@ class MPIWrapper:
 
     def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
                  ghost_cells: tuple[int, int, int, int],
-                 comm=MPI.COMM_WORLD, *args, **kwargs):
+                 comm=MPI.COMM_WORLD, boundary_conditions=BoundaryConditions(), *args, **kwargs):
         """
         Creates a wrapper for the simulator, and the simulator chosen.
         :param simulator_type: Simulator type to create from the given arguments.
@@ -51,16 +51,30 @@ class MPIWrapper:
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
         # Create boundary conditions
-        # TODO figure out why this works by using an undefined boundary condition
-        boundary_conditions = BoundaryConditions(
-            north=BoundaryType.DIRICHLET,
-            east=BoundaryType.DIRICHLET,
-            south=BoundaryType.DIRICHLET,
-            west=BoundaryType.DIRICHLET
-        )
+        boundary_conditions_args = {
+            'north': boundary_conditions.north,
+            'east': boundary_conditions.east,
+            'south': boundary_conditions.south,
+            'west': boundary_conditions.west,
+            'sponge_cells': boundary_conditions.spongeCells
+        }
+
+        if not boundary_conditions.isPeriodicNorthSouth():
+            if self.grid.north is not None:
+                boundary_conditions_args['north'] = BoundaryType.DIRICHLET
+            if self.grid.south is not None:
+                boundary_conditions_args['south'] = BoundaryType.DIRICHLET
+        if not boundary_conditions.isPeriodicEastWest():
+            if self.grid.east is not None:
+                boundary_conditions_args['east'] = BoundaryType.DIRICHLET
+            if self.grid.west is not None:
+                boundary_conditions_args['west'] = BoundaryType.DIRICHLET
+
+        boundary_conditions = BoundaryConditions(**boundary_conditions_args)
 
         # Decompose the information
-        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm, 'boundary_conditions': boundary_conditions})
+        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm,
+                       'boundary_conditions': boundary_conditions})
 
         x_ghost_cells = ghost_cells[1] + ghost_cells[3]
         y_ghost_cells = ghost_cells[0] + ghost_cells[2]
