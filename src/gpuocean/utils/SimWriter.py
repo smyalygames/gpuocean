@@ -169,8 +169,6 @@ class SimNetCDFWriter:
             self.y0 += self.ghost_cells_tot_y * Grid.y_pos
             self.y1 += self.ghost_cells_tot_y * (Grid.y_pos + 1)
 
-        print(f"OKOKOKO COORDINATE ({Grid.x_pos}, {Grid.y_pos})/[{self.y0}:{self.y1}, {self.x0}:{self.x1}] REQUESTED: [{self.y0}:{self.y1}, {self.x0}:{self.x1}]!!!!!!!!!!!!!")
-
         # Organize directory and create file:
         if sim.comm:
             os.makedirs(self.dir_name, exist_ok=True)
