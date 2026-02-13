@@ -10,12 +10,12 @@ from mpi4py import MPI
 
 from gpuocean.utils.gpu import Array2D
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
+from gpuocean.SWEsimulators import SimulatorType
 
 from .grid import Grid
 
 if TYPE_CHECKING:
     from mpi4py.MPI import Request
-    from gpuocean.SWEsimulators import SimulatorType
     from gpuocean.SWEsimulators.Simulator import Simulator
 
 
@@ -110,6 +110,10 @@ class MPIWrapper:
 
         # Create the simulator
         self.sim: Simulator = simulator_type.value(*args, **kwargs)
+
+        # Check if dt needs to calculated
+        if kwargs['dt'] <= 0:
+            self.update_dt()
 
         self.step_number = 0
 
@@ -241,7 +245,7 @@ class MPIWrapper:
         """
         return self.sim.arrays
 
-    def step(self, t_end=0.0):
+    def step(self, t_end=0.0, update_dt=False):
         t_now = 0.0
 
         if t_end == 0:
@@ -249,9 +253,57 @@ class MPIWrapper:
             self.sim.step(t_end)
 
         while t_now < t_end:
+            if update_dt:
+                self.update_dt()
+
             t_now += self.sim.dt
             self._exchange()
             self.sim.step(t_now)
+
+    def update_dt(self, courant_number: float = None):
+        """
+        Updates the time step self.dt by finding the maximum size of dt according to the
+        CFL conditions, and scale it with the provided courant number (0.8 on default).
+        """
+        if not isinstance(self.sim, SimulatorType.CDKLM16.value):
+            raise TypeError(f"Cannot update time step size (dt) with simulator type: {type(self.sim)}. "
+                            f"Only CDKLM16 simulator is supported.")
+
+        # Can probably remove the async call and just run self.sim.updateDt(), and allreduce self.sim.dt
+
+        if courant_number is None:
+            courant_number = self.sim.courant_number
+
+        self.sim.per_block_max_dt_kernel.async_call(self.sim.global_size, self.sim.local_size, self.sim.gpu_stream,
+                                                    [self.sim.nx, self.sim.ny,
+                                                     self.sim.dx, self.sim.dy,
+                                                     self.sim.g,
+                                                     self.sim.gpu_data.h0.pointer, self.sim.gpu_data.h0.pitch,
+                                                     self.sim.gpu_data.hu0.pointer, self.sim.gpu_data.hu0.pitch,
+                                                     self.sim.gpu_data.hv0.pointer, self.sim.gpu_data.hv0.pitch,
+                                                     self.sim.bathymetry.Bm.pointer, self.sim.bathymetry.Bm.pitch,
+                                                     self.sim.bathymetry.mask_value,
+                                                     self.sim.device_dt.pointer, self.sim.device_dt.pitch])
+
+        self.sim.max_dt_reduction_kernel.async_call((1, 1),
+                                                    (self.sim.num_threads_dt, 1, 1),
+                                                    self.sim.gpu_stream,
+                                                    [self.sim.num_blocks_dt,
+                                                     self.sim.device_dt.pointer,
+                                                     self.sim.max_dt_buffer.pointer])
+
+        dt_host = self.sim.max_dt_buffer.download(self.gpu_stream)
+
+        global_dt_max = np.zeros(1, dtype=np.float32)
+
+        self.comm.Allreduce(dt_host, global_dt_max, op=MPI.MIN)
+
+        if global_dt_max == 0:
+            raise RuntimeError("New timestep (dt) is zero.")
+
+        self.logger.debug(f"New dt is: {global_dt_max[0]}. Local dt was: {dt_host[0][0]}.")
+
+        self.sim.dt = courant_number * float(global_dt_max)
 
     def cleanUp(self):
         self.sim.cleanUp()
