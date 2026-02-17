@@ -34,6 +34,7 @@ import numpy as np
 import numpy.typing as npt
 
 from gpuocean.utils import Common
+from gpuocean.utils.dataclass.ghost_cell import GhostCells
 from gpuocean.utils.gpu import GPUStream, Array2D
 
 try:
@@ -94,6 +95,13 @@ class Simulator(ABC):
         self.gpu_ctx = gpu_ctx
         self.nx = int(nx)
         self.ny = int(ny)
+        self.ghost_cells = GhostCells(
+            north=int(ghost_cells_x),
+            south=int(ghost_cells_x),
+            east=int(ghost_cells_y),
+            west=int(ghost_cells_y)
+        )
+        # TODO remove these ghost cells to replace with the above variable.
         self.ghost_cells_x = int(ghost_cells_x)
         self.ghost_cells_y = int(ghost_cells_y)
         self.dx = float(dx)
@@ -312,14 +320,14 @@ class Simulator(ABC):
         """
         All the GPU arrays used for the simulation.
         """
-        return list(self.gpu_data.arrays) + [
-            self.wind_stress_x_current_arr,
-            self.wind_stress_y_current_arr,
-            self.wind_stress_x_next_arr,
-            self.wind_stress_y_next_arr,
-            self.atmospheric_pressure_current_arr,
-            self.atmospheric_pressure_next_arr
-        ]
+        return list(self.gpu_data.arrays) # + [
+            # self.wind_stress_x_current_arr,
+            # self.wind_stress_y_current_arr,
+            # self.wind_stress_x_next_arr,
+            # self.wind_stress_y_next_arr,
+            # self.atmospheric_pressure_current_arr,
+            # self.atmospheric_pressure_next_arr
+        # ]
 
     @abstractmethod
     def step(self, t_end=0.0):
