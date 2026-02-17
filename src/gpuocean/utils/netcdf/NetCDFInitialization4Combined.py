@@ -26,13 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 import numpy as np
-import datetime, os, copy
-from netCDF4 import Dataset, MFDataset
+import copy
+from netCDF4 import Dataset
 
 import seawater as sw
-from scipy.ndimage.filters import convolve, gaussian_filter
 
-from gpuocean.utils import NetCDFInitialization
+from gpuocean.utils.netcdf import NetCDFInitialization
 
 
 def potentialDensities(source_url, t=0, x0=0, x1=-1, y0=0, y1=-1):
@@ -187,13 +186,13 @@ def getCombinedInitialConditions(source_url, x0, x1, y0, y1, mld_dens,
     """
 
     full_IC = NetCDFInitialization.getInitialConditions(source_url, x0, x1, y0, y1, \
-                         timestep_indices=timestep_indices, \
-                         norkyst_data = norkyst_data,
-                         land_value=land_value, \
-                         iterations=iterations, \
-                         sponge_cells=sponge_cells, \
-                         erode_land=erode_land, 
-                         download_data=download_data)
+                                                        timestep_indices=timestep_indices, \
+                                                        norkyst_data = norkyst_data,
+                                                        land_value=land_value, \
+                                                        iterations=iterations, \
+                                                        sponge_cells=sponge_cells, \
+                                                        erode_land=erode_land,
+                                                        download_data=download_data)
 
 
     barotropic_IC = copy.deepcopy(full_IC)
@@ -254,7 +253,7 @@ def getCombinedInitialConditions(source_url, x0, x1, y0, y1, mld_dens,
     hus = []
     hvs = []
     for t_idx in t_range:
-        mld = NetCDFInitialization.fill_coastal_data(MLD(source_url, mld_dens, min_mld=1.5, max_mld=40, x0=x0-1, x1=x1+1, y0=y0-1, y1=y1+1, t=t_idx))
+        mld = NetCDFInitialization.fill_coastal_data(MLD(source_url, mld_dens, min_mld=1.5, max_mld=40, x0=x0 - 1, x1=x1 + 1, y0=y0 - 1, y1=y1 + 1, t=t_idx))
         ml_integrator = MLD_integrator(source_url, mld, t=t_idx, x0=x0-1, x1=x1+1, y0=y0-1, y1=y1+1)
 
         u = nc.variables['u'][t_idx, :, y0-1:y1+1, x0-1:x1+2].filled(fill_value = 0.0) 

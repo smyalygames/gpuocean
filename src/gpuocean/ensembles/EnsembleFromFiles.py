@@ -26,12 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import gc
-import os, sys, datetime
+import os, datetime
 
 import numpy as np
 
 from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import ParticleInfo, Observation, SimReader
+from gpuocean.utils import ParticleInfo, Observation
+from gpuocean.utils.netcdf import SimNetCDFReader
 from gpuocean.ensembles import BaseOceanStateEnsemble
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 from gpuocean.utils.gpu import GPUStream
@@ -214,7 +215,7 @@ class EnsembleFromFiles(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         
     
     def _initializeTruthFromFile(self):
-        self.true_state_reader = SimReader.SimNetCDFReader(self.true_state_nc_files[0])
+        self.true_state_reader = SimNetCDFReader(self.true_state_nc_files[0])
 
     def _initializeObservationsFromFile(self):    
         self.observations = Observation.Observation(observation_type=self.observation_type,

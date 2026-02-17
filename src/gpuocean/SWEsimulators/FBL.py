@@ -35,7 +35,8 @@ import numpy as np
 import numpy.typing as npt
 
 from gpuocean.SWEsimulators import Simulator
-from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure
+from gpuocean.utils import WindStress, AtmosphericPressure
+from gpuocean.utils.netcdf import SimNetCDFWriter, SimNetCDFReader
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 from gpuocean.utils.gpu import GPUHandler, Array2D, SWEDataArakawaC
 
@@ -201,7 +202,7 @@ class FBL(Simulator.Simulator):
             self.wall_bc += 8
 
         if self.write_netcdf:
-            self.sim_writer = SimWriter.SimNetCDFWriter(self, ignore_ghostcells=self.ignore_ghostcells,
+            self.sim_writer = SimNetCDFWriter(self, ignore_ghostcells=self.ignore_ghostcells,
                                                         staggered_grid=True,
                                                         offset_x=self.offset_x, offset_y=self.offset_y)
 
@@ -213,7 +214,7 @@ class FBL(Simulator.Simulator):
         filename: Continue simulation based on parameters and last timestep in this file
         """
         # open nc-file
-        sim_reader = SimReader.SimNetCDFReader(filename, ignore_ghostcells=False)
+        sim_reader = SimNetCDFReader(filename, ignore_ghostcells=False)
         sim_name = str(sim_reader.get('simulator_short'))
         assert sim_name == cls.__name__, \
             "Trying to initialize a " + \
@@ -334,7 +335,7 @@ class FBL(Simulator.Simulator):
             self.num_iterations += 1
 
         if self.write_netcdf:
-            self.sim_writer.writeTimestep(self)
+            self.sim_writer.write_timestep(self)
 
         return self.t
 

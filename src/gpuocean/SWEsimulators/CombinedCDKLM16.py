@@ -28,17 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # Import packages we need
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import datetime, copy
+import datetime
 import logging
 
-from sqlite3 import enable_shared_cache
-from xmlrpc.server import DocXMLRPCServer
 import numpy as np
 import numpy.typing as npt
 
-from gpuocean.utils import Common, SimWriter, SimReader, WindStress
-from gpuocean.SWEsimulators import Simulator, OceanStateNoise
-from gpuocean.utils import OceanographicUtilities, NetCDFInitialization
+from gpuocean.utils import Common, WindStress
 from gpuocean.utils.gpu import GPUStream
 
 from gpuocean.SWEsimulators import CDKLM16
@@ -350,8 +346,8 @@ class CombinedCDKLM16:
 
         # Write to file
         if self.barotropic_sim.write_netcdf and self.baroclinic_sim.write_netcdf and write_now:
-            self.barotropic_sim.sim_writer.writeTimestep(self.barotropic_sim)
-            self.baroclinic_sim.sim_writer.writeTimestep(self.baroclinic_sim)
+            self.barotropic_sim.sim_writer.write_timestep(self.barotropic_sim)
+            self.baroclinic_sim.sim_writer.write_timestep(self.baroclinic_sim)
 
         return self.barotropic_sim.t, self.baroclinic_sim.t
 

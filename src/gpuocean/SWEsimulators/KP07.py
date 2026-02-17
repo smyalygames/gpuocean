@@ -36,7 +36,7 @@ import gc
 import numpy as np
 import numpy.typing as npt
 
-from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure
+from gpuocean.utils.netcdf import SimNetCDFWriter, SimNetCDFReader
 from gpuocean.SWEsimulators import Simulator
 from gpuocean.utils.Common import BoundaryConditions, BoundaryConditionsData
 from gpuocean.utils.gpu.arrays.bathymetry import Bathymetry
@@ -217,7 +217,7 @@ class KP07(Simulator.Simulator):
                                                     boundary_conditions_data)
 
         if self.write_netcdf:
-            self.sim_writer = SimWriter.SimNetCDFWriter(self, ignore_ghostcells=self.ignore_ghostcells,
+            self.sim_writer = SimNetCDFWriter(self, ignore_ghostcells=self.ignore_ghostcells,
                                                         offset_x=self.offset_x, offset_y=self.offset_y)
 
     @classmethod
@@ -228,7 +228,7 @@ class KP07(Simulator.Simulator):
         filename: Continue simulation based on parameters and last timestep in this file
         """
         # open nc-file
-        sim_reader = SimReader.SimNetCDFReader(filename, ignore_ghostcells=False)
+        sim_reader = SimNetCDFReader(filename, ignore_ghostcells=False)
         sim_name = str(sim_reader.get('simulator_short'))
         assert sim_name == cls.__name__, \
             "Trying to initialize a " + \
@@ -400,7 +400,7 @@ class KP07(Simulator.Simulator):
             self.num_iterations += 1
 
         if self.write_netcdf:
-            self.sim_writer.writeTimestep(self)
+            self.sim_writer.write_timestep(self)
 
         return self.t
 

@@ -13,7 +13,7 @@ class ImportTests(unittest.TestCase):
 
     
     def test_import_utils_SimReader(self):
-        from gpuocean.utils import SimReader
+        from gpuocean.utils.netcdf import SimNetCDFReader
         
     def test_import_utils_Common(self):
         from gpuocean.utils import Common
@@ -22,7 +22,7 @@ class ImportTests(unittest.TestCase):
         from gpuocean.utils import Observation
         
     def test_import_utils_NetCDFInitialization(self):
-        from gpuocean.utils import NetCDFInitialization
+        from gpuocean.utils.netcdf import NetCDFInitialization
         
     def test_import_utils_config(self):
         from gpuocean.utils import config
@@ -46,7 +46,7 @@ class ImportTests(unittest.TestCase):
         from gpuocean.utils import DoubleJetExperimentUtils
         
     def test_import_utils_SimWriter(self):
-        from gpuocean.utils import SimWriter
+        from gpuocean.utils.netcdf import SimNetCDFWriter
         
     def test_import_utils_BathymetryAndICs(self):
         from gpuocean.utils import BathymetryAndICs

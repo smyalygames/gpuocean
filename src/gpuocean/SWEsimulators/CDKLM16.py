@@ -35,7 +35,8 @@ import numpy as np
 import numpy.typing as npt
 from scipy.interpolate import RectBivariateSpline
 
-from gpuocean.utils import SimWriter, SimReader, WindStress, AtmosphericPressure, OceanographicUtilities
+from gpuocean.utils import WindStress, AtmosphericPressure, OceanographicUtilities
+from gpuocean.utils.netcdf import SimNetCDFWriter, SimNetCDFReader
 from gpuocean.utils.Common import BoundaryConditions, BoundaryConditionsData
 from gpuocean.utils.gpu.arrays.bathymetry import Bathymetry
 from gpuocean.SWEsimulators import Simulator, OceanStateNoise, ModelErrorKL
@@ -372,7 +373,7 @@ class CDKLM16(Simulator.Simulator):
             self.model_time_step = self.dt
 
         if self.write_netcdf:
-            self.sim_writer = SimWriter.SimNetCDFWriter(self, super_dir_name=super_dir_name, filename=netcdf_filename,
+            self.sim_writer = SimNetCDFWriter(self, super_dir_name=super_dir_name, filename=netcdf_filename,
                                                         ignore_ghostcells=self.ignore_ghostcells,
                                                         offset_x=self.offset_x, offset_y=self.offset_y)
 
@@ -434,7 +435,7 @@ class CDKLM16(Simulator.Simulator):
         new_netcdf_filename: If we want to continue to write netcdf, we should use this filename. Automatically generated if None.
         """
         # open nc-file
-        sim_reader = SimReader.SimNetCDFReader(filename, ignore_ghostcells=False)
+        sim_reader = SimNetCDFReader(filename, ignore_ghostcells=False)
         sim_name = str(sim_reader.get('simulator_short'))
         assert sim_name == cls.__name__, \
             "Trying to initialize a " + \
@@ -600,7 +601,7 @@ class CDKLM16(Simulator.Simulator):
                                                                    block_height=block_height_model_error)
 
         if self.write_netcdf:
-            self.sim_writer.writeModelError(self)
+            self.sim_writer.write_model_error(self)
 
     def setModelErrorFromFile(self, filename, use_lcg=False, xorwow_seed=None):
         """
@@ -608,7 +609,7 @@ class CDKLM16(Simulator.Simulator):
         filename: NetCDF file that has been written from a CDKLM simulator
         """
         # open nc-file
-        sim_reader = SimReader.SimNetCDFReader(filename, ignore_ghostcells=False)
+        sim_reader = SimNetCDFReader(filename, ignore_ghostcells=False)
         sim_name = str(sim_reader.get('simulator_short'))
         assert sim_name == self.__class__.__name__, \
             "Trying to initialize a " + \
@@ -816,7 +817,7 @@ class CDKLM16(Simulator.Simulator):
                 self.updateDt(courant_number=courant_number)
 
         if self.write_netcdf and write_now:
-            self.sim_writer.writeTimestep(self)
+            self.sim_writer.write_timestep(self)
 
         assert (round(observation_time) == round(
             self.t)), 'The simulation time is not the same as observation time after dataAssimilationStep! \n' + \
@@ -824,7 +825,7 @@ class CDKLM16(Simulator.Simulator):
 
     def writeState(self):
         if self.write_netcdf:
-            self.sim_writer.writeTimestep(self)
+            self.sim_writer.write_timestep(self)
 
     def updateDt(self, courant_number: float = None):
         """

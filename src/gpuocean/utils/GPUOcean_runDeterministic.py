@@ -1,7 +1,4 @@
 #Import packages we need
-import datetime
-import importlib
-from datetime import timedelta
 import pyproj
 
 import numpy as np
@@ -12,7 +9,8 @@ from matplotlib import pyplot as plt
 
 #For GPUOcean
 from gpuocean.SWEsimulators import CDKLM16
-from gpuocean.utils import Common, PlotHelper, NetCDFInitialization, Observation
+from gpuocean.utils import Common, PlotHelper, Observation
+from gpuocean.utils.netcdf import NetCDFInitialization
 from gpuocean.drifters import GPUDrifterCollection
 from gpuocean.dataassimilation import DataAssimilationUtils as dautils
 
@@ -269,9 +267,9 @@ def simulate_gpuocean_deterministic(source_url, domain, initx, inity,
     end_forecast_hours = start_forecast_hours + duration
     
     #Create simulator
-    data_args = NetCDFInitialization.getInitialConditions(source_url, domain[0], domain[1], domain[2],domain[3] , 
-                     timestep_indices = None,norkyst_data = norkyst_data, erode_land = erode_land, download_data = False, 
-                     reduced_gravity_interface=reduced_gravity_interface)
+    data_args = NetCDFInitialization.getInitialConditions(source_url, domain[0], domain[1], domain[2], domain[3],
+                                                          timestep_indices = None, norkyst_data = norkyst_data, erode_land = erode_land, download_data = False,
+                                                          reduced_gravity_interface=reduced_gravity_interface)
     
     if wind_drift_factor:
         wind_data = data_args.pop('wind', None)

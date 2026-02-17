@@ -424,9 +424,9 @@ class SimNetCDFWriter:
 
         # Init conditions should be added as the first element in the above arrays!
         self.i = 0
-        self.writeTimestep(sim)
+        self.write_timestep(sim)
 
-    def writeModelError(self, sim):
+    def write_model_error(self, sim):
         # Write parameters related to stochastic model error and data assimilation
         # At the time of writing, such parameters are only available in the CDKLM simulator.
         if sim.__class__.__name__ == "CDKLM16":
@@ -483,7 +483,7 @@ class SimNetCDFWriter:
         print("Closing file " + self.output_file_name + " ...")
         self.ncfile.close()
 
-    def writeTimestep(self, sim: Simulator):
+    def write_timestep(self, sim: Simulator):
         eta, hu, hv = sim.download()
 
         # Get rid of ghost cells from downloaded arrays
@@ -532,32 +532,32 @@ class SimNetCDFWriter:
 
         self.i += 1
 
-    def _addText(self, ax, msg):
+    def _add_text(self, ax, msg):
         bp = 70  # breakpoint
         if len(msg) > bp:
             rest = '     ' + msg[bp:]
             ax.text(0.1, self.textPos, msg[0:bp])
             self.textPos -= 0.2
-            self._addText(ax, rest)
+            self._add_text(ax, rest)
         else:
             ax.text(0.1, self.textPos, msg)
             # print len(msg)
             self.textPos -= 0.2
 
-    def infoPlot(self, ax):
+    def info_plot(self, ax):
         self.textPos = 2.3
         # Ax is the subplot object
         ax.text(1, 2.8, 'NetCDF INFO')
 
-        self._addText(ax, 'working directory: ' + self.current_directory)
-        self._addText(ax, 'filename: ' + self.output_file_name)
-        self._addText(ax, '')
-        self._addText(ax, 'git hash: ' + self.git_hash)
-        self._addText(ax, '')
-        self._addText(ax, 'Simulator: ' + self.simulator_short)
-        self._addText(ax, 'BC: ' + str(self.boundary_conditions))
-        self._addText(ax, 'f:  ' + str(self.coriolis_force))
-        self._addText(ax, 'dt: ' + str(self.dt) + ", dx: " + str(self.dx) + ", dy: " + str(self.dy))
-        self._addText(ax, 'wind type: ' + str(self.wind_stress))
+        self._add_text(ax, 'working directory: ' + self.current_directory)
+        self._add_text(ax, 'filename: ' + self.output_file_name)
+        self._add_text(ax, '')
+        self._add_text(ax, 'git hash: ' + self.git_hash)
+        self._add_text(ax, '')
+        self._add_text(ax, 'Simulator: ' + self.simulator_short)
+        self._add_text(ax, 'BC: ' + str(self.boundary_conditions))
+        self._add_text(ax, 'f:  ' + str(self.coriolis_force))
+        self._add_text(ax, 'dt: ' + str(self.dt) + ", dx: " + str(self.dx) + ", dy: " + str(self.dy))
+        self._add_text(ax, 'wind type: ' + str(self.wind_stress))
 
         ax.axis([0, 6, 0, 3])
