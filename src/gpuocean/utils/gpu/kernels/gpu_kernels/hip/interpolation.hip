@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "common.hip"
-#include <hip/hip_runtime.h>
+//#include <hip/hip_runtime.h>
 
 /**
   *  Calculating the coefficient matrix for bicubic interpolation.
