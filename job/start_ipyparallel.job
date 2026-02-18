@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --job-name=gpuocean_ipyparallel
+#SBATCH --account=project_465002280
+#SBATCH --partition=dev-g
+#SBATCH --nodes=2
+#SBATCH --gpus-per-node=1
+#SBATCH --mem-per-gpu=20G
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=02:00:00
+
+module load LUMI
+module load cray-python
+module load mpi4py
+
+# Start controller on the master node
+singularity exec /project/project_465002280/martinli/gpuocean/gpu_ocean.sif ipcontroller --ip='*' &
+sleep 10 # Give controller time to start
+
+# Start engines on compute nodes
+srun --mpi=pmi2 singularity exec /project/project_465002280/martinli/gpuocean/gpu_ocean.sif ipengine --mpi &
+
+wait
