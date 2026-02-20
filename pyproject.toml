@@ -8,11 +8,11 @@ dependencies = [
     "numpy",
     "scipy",
     "pandas",
-    "netcdf4",
     "xmlrunner",
     "matplotlib",
     "nbdime",
     "mpi4py",
+    "netcdf4",
     "requests",
     "pytest",
     "pyproj",
@@ -21,30 +21,33 @@ dependencies = [
     "gitpython",
     "scikit-image",
     "tqdm",
-    "hip-python",
-    "amd-cupy~=13.5.1",
+    "hip-python~=7.0.0",
+    "cupy-rocm-7-0~=14.0.0",
     "notebook>=7.4.7",
     "scipy-stubs~=1.15.3",
 ]
 
 [tool.uv]
 default-groups = "all"
-no-binary-package = ["mpi4py"]
+no-binary-package = ["mpi4py", "netcdf4"]
 #extra-build-variables = { cupy = { CUPY_INSTALL_USE_HIP="1", ROCM_HOME="/opt/rocm", HCC_AMDGPU_TARGET="gfx1030" } }
+
+[tool.uv.extra-build-dependencies]
+netcdf4 = [{requirement = "mpi4py", match-runtime = true}]
 
 [tool.uv.sources]
 hip-python = { index = "hip" }
-amd-cupy = { index = "cupy" }
+#amd-cupy = { index = "cupy" }
 
 [[tool.uv.index]]
 name = "hip"
 url = "https://test.pypi.org/simple/"
 explicit = true
 
-[[tool.uv.index]]
-name = "cupy"
-url = "https://pypi.amd.com/simple"
-explicit = true
+#[[tool.uv.index]]
+#name = "cupy"
+#url = "https://pypi.amd.com/simple"
+#explicit = true
 
 [build-system]
 requires = ["uv_build>=0.9.23,<0.10.0"]
