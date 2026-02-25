@@ -11,6 +11,7 @@ docker run \
     --cap-add=SYS_PTRACE \
     --ipc=host \
     --privileged=true \
+    --user=1000 \
     --network=host \
     --device=/dev/kfd \
     --device=/dev/dri \
@@ -18,5 +19,6 @@ docker run \
     -v .:/app \
     -v /app/.venv \
     -e ROCM_HOME=/opt/rocm \
+    -p 12345:12345 \
     $(docker build -q .) \
     "$@"

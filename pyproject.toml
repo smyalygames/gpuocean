@@ -3,12 +3,12 @@ name = "gpuocean"
 version = "1.4.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = "~=3.10.0"
+requires-python = "~=3.13.0"
 dependencies = [
     "numpy",
     "scipy",
     "pandas",
-    "xmlrunner",
+#    "unittest-xml-reporting",
     "matplotlib",
     "nbdime",
     "mpi4py",
@@ -30,24 +30,17 @@ dependencies = [
 [tool.uv]
 default-groups = "all"
 no-binary-package = ["mpi4py", "netcdf4"]
-#extra-build-variables = { cupy = { CUPY_INSTALL_USE_HIP="1", ROCM_HOME="/opt/rocm", HCC_AMDGPU_TARGET="gfx1030" } }
 
 [tool.uv.extra-build-dependencies]
 netcdf4 = [{requirement = "mpi4py", match-runtime = true}]
 
 [tool.uv.sources]
 hip-python = { index = "hip" }
-#amd-cupy = { index = "cupy" }
 
 [[tool.uv.index]]
 name = "hip"
 url = "https://test.pypi.org/simple/"
 explicit = true
-
-#[[tool.uv.index]]
-#name = "cupy"
-#url = "https://pypi.amd.com/simple"
-#explicit = true
 
 [build-system]
 requires = ["uv_build>=0.9.23,<0.10.0"]

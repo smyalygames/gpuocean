@@ -55,7 +55,8 @@ RUN cmake -S . -B build \
     -DHDF5_ENABLE_PARALLEL=ON \
     -DHDF5_ALLOW_UNSUPPORTED=ON
 
-RUN cmake --build build
+RUN cmake --build build --config Debug
+RUN ctest build -C Debug
 RUN cmake --install build
 RUN ldconfig
 WORKDIR /
@@ -89,10 +90,11 @@ RUN cmake -S . -B build \
 RUN cmake --build build
 RUN cmake --install build
 WORKDIR /
-RUN rm -rf /netcdf-c
+RUN #rm -rf /netcdf-c
 
 
 # Install dependencies
+USER 1000
 WORKDIR /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -102,6 +104,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN git config --global --add safe.directory /app
 
 # Cleanup
+USER root
 RUN apt-get clean
 RUN rm -rf /var/lib/apt /var/lib/dpkg /var/lib/cache /var/lib/log
+USER 1000
 
