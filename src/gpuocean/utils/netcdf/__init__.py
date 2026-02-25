@@ -1,5 +1,2 @@
-from SimReader import SimNetCDFReader
-from SimWriter import SimNetCDFWriter
-
-import NetCDFInitialization
-import NetCDFInitialization4Combined
+from .SimReader import SimNetCDFReader
+from .sim_writer import SimNetCDFWriter
