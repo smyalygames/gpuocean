@@ -113,7 +113,7 @@ class CuPyArray2D(BaseArray2D):
 
         return self.data[start[0]:end[0], start[1]:end[1]].copy()
 
-    def upload_boundary(self, gpu_stream: CuPyStream, data: CuPyArray2D, direction: direction_t) -> None:
+    def upload_boundary(self, gpu_stream: CuPyStream, data: cp.ndarray, direction: direction_t) -> None:
         start, end = self._get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 

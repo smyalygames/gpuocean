@@ -16,7 +16,7 @@ from .grid import Grid
 
 if TYPE_CHECKING:
     from mpi4py.MPI import Request
-    from gpuocean.SWEsimulators.Simulator import Simulator
+    from gpuocean.utils.types import AnySimulator
 
 
 class MPIWrapper:
@@ -109,7 +109,7 @@ class MPIWrapper:
                     kwargs[key] = value[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
 
         # Create the simulator
-        self.sim: Simulator = simulator_type.value(*args, **kwargs)
+        self.sim: AnySimulator = simulator_type.value(*args, **kwargs)
 
         # Check if dt needs to calculated
         if kwargs['dt'] <= 0:
