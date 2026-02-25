@@ -257,8 +257,7 @@ class MPIWrapper:
                 self.update_dt()
 
             t_now += self.sim.dt
-            self._exchange()
-            self.sim.step(t_now)
+            self.sim.step(self.sim.dt)
 
     def update_dt(self, courant_number: float = None):
         """
