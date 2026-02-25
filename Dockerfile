@@ -103,9 +103,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 RUN git config --global --add safe.directory /app
 
+
 # Cleanup
 USER root
 RUN apt-get clean
 RUN rm -rf /var/lib/apt /var/lib/dpkg /var/lib/cache /var/lib/log
 USER 1000
-

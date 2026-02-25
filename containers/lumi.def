@@ -1,9 +1,10 @@
 BootStrap: docker
-From: rocm/dev-ubuntu-24.04:6.4.3
+From: rocm/dev-ubuntu-24.04:6.4.3-complete
 
 %environment
     export PATH=/opt/.venv/bin:/root/.local/bin:$PATH
     export VIRTUAL_ENV=/opt/.venv
+    export ROCM_HOME=/opt/rocm
 
 %files
    .python-version /opt
@@ -30,10 +31,13 @@ From: rocm/dev-ubuntu-24.04:6.4.3
     tar xf mpich-$MPICH_VERSION.tar.gz
     cd mpich-$MPICH_VERSION
 
-    ./configure --disable-fortran --enable-fast=all,O3 --prefix=/usr --with-device=ch3
+    ./configure --disable-fortran --enable-fast=all,O3 --prefix=/usr --with-device=ch3 --with-hip=/opt/rocm
     make -j$(nproc)
     make install
     ldconfig
+
+    # Install netcdf
+    apt-get install hdf5-tools libhdf5-mpich-310 netcdf-parallel
 
     # Install uv
     echo -e "\e[32m + \e[39mInstalling \e[uv\e[0m..."
@@ -44,6 +48,10 @@ From: rocm/dev-ubuntu-24.04:6.4.3
     echo -e "\e[32m + \e[39mCreating \e[uv environment\e[0m..."
     cd /opt
     uv sync
+
+    # Hacky method of installing cupy through uv
+    uv pip uninstall amd-cupy
+    uv pip install amd-cupy --extra-index-url https://pypi.amd.com/rocm-7.0.2/simple
 
     # Cleanup
     apt-get clean
