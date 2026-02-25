@@ -11,6 +11,7 @@ from mpi4py import MPI
 from gpuocean.utils.gpu import Array2D
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 from gpuocean.SWEsimulators import SimulatorType
+from gpuocean.utils.dataclass import GhostCells
 
 from .grid import Grid
 
@@ -76,15 +77,14 @@ class MPIWrapper:
         kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm,
                        'boundary_conditions': boundary_conditions})
 
-        x_ghost_cells = ghost_cells[1] + ghost_cells[3]
-        y_ghost_cells = ghost_cells[0] + ghost_cells[2]
+        ghost_cells = GhostCells(*ghost_cells)
 
-        original_shape = (global_ny + y_ghost_cells, global_nx + x_ghost_cells)
+        original_shape = (global_ny + ghost_cells.total_y, global_nx + ghost_cells.total_x)
 
         splice_x0 = self.grid.x0
-        splice_x1 = self.grid.x1 + x_ghost_cells
+        splice_x1 = self.grid.x1 + ghost_cells.total_x
         splice_y0 = self.grid.y0
-        splice_y1 = self.grid.y1 + y_ghost_cells
+        splice_y1 = self.grid.y1 + ghost_cells.total_y
 
         self.logger.debug(f"Splicing arrays with [{splice_y0}:{splice_y1}, {splice_x0}:{splice_x1}].")
 
