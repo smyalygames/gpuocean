@@ -36,3 +36,4 @@ else:
 # Objects that are not dependent on GPU language
 from .arrays.arkawa import SWEDataArakawaA, SWEDataArakawaC
 from .arrays.bc_arkawa import BoundaryConditionsArakawaA
+from .utils import device as gpu_device

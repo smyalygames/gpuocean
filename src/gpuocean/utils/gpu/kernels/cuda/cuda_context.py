@@ -30,6 +30,7 @@ import pycuda.driver as cuda
 
 from gpuocean.utils.timer import Timer
 from ..context import Context, DeviceInfo
+from ...utils.device import get_device_count
 
 
 class CudaContext(Context):
@@ -37,7 +38,7 @@ class CudaContext(Context):
     Class which keeps track of the CUDA context and some helper functions
     """
 
-    def __init__(self, device=0, blocking=False, context_flags=None, use_cache=True):
+    def __init__(self, device=None, blocking=False, context_flags=None, use_cache=True):
         """
         Create a new CUDA context
 
@@ -50,6 +51,8 @@ class CudaContext(Context):
 
         super().__init__(self.Architecture.CUDA, device, context_flags, use_cache)
 
+        if device is None:
+            device = 0
         self.device = device
 
         # Initialize cuda (must be the first call to PyCUDA)
@@ -58,8 +61,8 @@ class CudaContext(Context):
         self.logger.info(f"PyCUDA version {str(pycuda.VERSION_TEXT)}")
 
         # Check that the device id is valid
-        if self.device >= cuda.Device.count():
-            self.device = self.device % cuda.Device.count()
+        if self.device >= get_device_count():
+            self.device = self.device % get_device_count()
             self.logger.debug(f"Changing device ID from {str(device)} to {str(self.device)}")
 
         self.cuda_device = cuda.Device(self.device)

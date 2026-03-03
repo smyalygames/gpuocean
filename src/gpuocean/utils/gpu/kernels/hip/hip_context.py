@@ -7,6 +7,7 @@ from hip import hip, hiprtc
 
 from ..context import Context, DeviceInfo
 from ...hip_utils import hip_check
+from ...utils.device import get_device_count
 from gpuocean.utils.timer import Timer
 
 
@@ -34,15 +35,21 @@ class HIPContext(Context):
         self.logger.info(f"HIP Python version {hip_version}")
         self.logger.info(f"ROCm version {rocm_version}")
 
+        device_count = get_device_count()
+
         if device is None:
             device = 0
+
+        if device >= device_count:
+            message = f"Trying to set GPU to device {device}, when there are a total of {device_count} available."
+            self.logger.error(message)
+            raise RuntimeError(message)
 
         hip_check(hip.hipSetDevice(device))
 
         # Device information
         props = hip.hipDeviceProp_t()
         hip_check(hip.hipGetDeviceProperties(props, device))
-        device_count = hip_check(hip.hipGetDeviceCount())
         self.device_info = DeviceInfo(device, props.name.decode(), hip_version, rocm_version)
         self.arch = props.gcnArchName
 
