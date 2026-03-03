@@ -71,11 +71,11 @@ class MPIWrapper:
             if self.grid.west is not None:
                 boundary_conditions_args['west'] = BoundaryType.DIRICHLET
 
-        boundary_conditions = BoundaryConditions(**boundary_conditions_args)
+        local_boundary_conditions = BoundaryConditions(**boundary_conditions_args)
 
         # Decompose the information
         kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm,
-                       'boundary_conditions': boundary_conditions})
+                       'boundary_conditions': local_boundary_conditions})
 
         ghost_cells = GhostCells(*ghost_cells)
 
@@ -110,6 +110,10 @@ class MPIWrapper:
 
         # Create the simulator
         self.sim: AnySimulator = simulator_type.value(*args, **kwargs)
+        # Write the global boundary conditions to netCDF
+        if kwargs['write_netcdf']:
+            self.sim.sim_writer.nc.boundary_conditions = str(boundary_conditions)
+            self.sim.sim_writer.nc.boundary_conditions_sponge_mr = str(boundary_conditions.getSponge())
 
         # Check if dt needs to calculated
         if kwargs['dt'] <= 0:

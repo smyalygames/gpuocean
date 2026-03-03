@@ -191,8 +191,8 @@ class SimNetCDFWriter:
         self.nc.num_layers = self.num_layers
         self.nc.staggered_grid = str(self.staggered_grid)
         self.nc.simulator_short = self.sim_name
+        # NOTE if writing in parallel, a parent class will have to write the global boundary conditions
         if not self.write_parallel:
-            # FIXME add boundary conditions when using MPI
             self.nc.boundary_conditions = self.boundary_conditions
             self.nc.boundary_conditions_sponge_mr = self.boundary_conditions_sponge_mr
         self.nc.time_integrator = self.time_integrator
