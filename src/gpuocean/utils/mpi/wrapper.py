@@ -253,6 +253,7 @@ class MPIWrapper:
             self.sim.step(t_end)
 
         while t_now < t_end:
+            self._exchange()
             if update_dt:
                 self.update_dt()
 
