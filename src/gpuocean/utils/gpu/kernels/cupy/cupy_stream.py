@@ -1,29 +1,21 @@
 import cupy as cp
 
-from ..stream import Stream
+from ..hip.hip_stream import HIPStream
 
 
-class CuPyStream(Stream):
+class CuPyStream(HIPStream):
     """
     An object to handle CuPy Streams
     """
 
     def __init__(self):
-        self.__stream: cp.cuda.Stream = cp.cuda.Stream()
-        self.__stream.use()
-
-    @property
-    def _stream(self):
-        return self.__stream.ptr
-
-    def synchronize(self):
-        """
-        Synchronize the CuPy Stream
-        """
-        self.__stream.synchronize()
+        super().__init__()
+        self._cupy_stream: cp.cuda.ExternalStream = cp.cuda.ExternalStream(int(self._stream))
+        self._cupy_stream.use()
 
     def destroy(self):
         """
         Destroy the CuPy Stream.
         """
         cp.cuda.Stream.null.use()
+        super().destroy()
