@@ -46,14 +46,8 @@ class MPIExchange:
         if self.grid.west is not None:
             self.exists.append(Direction.WEST)
 
+        # Creates CuPy arrays for MPI exchanges.
         self.exchange_arrays: dict[Array2D, ArrayExchange] = {}
-        self._prepare_exchanges(arrays)
-        self.total_arrays = len(self.exchange_arrays)
-
-    def _prepare_exchanges(self, arrays: Iterable[Array2D]):
-        """
-        Creates buffers for exchanging partial data between arrays.
-        """
         for index, array in enumerate(arrays):
             exchanges = ArrayExchange(index, array)
 
@@ -72,19 +66,22 @@ class MPIExchange:
 
             self.exchange_arrays[array] = exchanges
 
-        # Remove unused array
-        buffer = None
+        self.total_arrays = len(self.exchange_arrays)
+
+    def _prepare_exchanges(self):
+        """
+        Prepares an exchange for use in MPI or NCCL.
+        """
+        for array, exchange in self.exchange_arrays.items():
+            exchange.prepare_send(self.gpu_stream)
+
+        self.gpu_stream.synchronize()
 
     def exchange(self):
         """
         Completes the MPI exchange for all the arrays.
         """
-
-        # Gather all the data to exchange
-        for array, exchange in self.exchange_arrays.items():
-            exchange.prepare_send(self.gpu_stream)
-
-        self.gpu_stream.synchronize()
+        self._prepare_exchanges()
 
         comm_send: list[Request] = []
         comm_recv: list[Request] = []
