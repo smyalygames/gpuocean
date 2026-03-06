@@ -114,8 +114,7 @@ class MPIWrapper:
             self.sim.sim_writer.nc.boundary_conditions = str(boundary_conditions)
             self.sim.sim_writer.nc.boundary_conditions_sponge_mr = str(boundary_conditions.getSponge())
 
-        self.max_dt_buffer = cp.empty((1, 1), dtype=cp.float32)
-        self.global_dt = cp.empty_like(self.max_dt_buffer)
+        self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
 
         # Check if dt needs to calculated
         if kwargs['dt'] <= 0:
@@ -178,10 +177,10 @@ class MPIWrapper:
                                                     self.sim.gpu_stream,
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
-                                                     self.max_dt_buffer.data])
+                                                     self.sim.max_dt_buffer.pointer])
         self.sim.gpu_stream.synchronize()
 
-        self.comm.Allreduce(self.max_dt_buffer, self.global_dt, op=MPI.MIN)
+        self.comm.Allreduce(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
 
         if self.global_dt == 0:
             raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")

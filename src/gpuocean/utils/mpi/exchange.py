@@ -4,10 +4,9 @@ import logging
 from dataclasses import dataclass
 
 from mpi4py import MPI
-import numpy as np
+import cupy as cp
 
 from gpuocean.utils.enum import Direction
-from gpuocean.utils.gpu import CuPyArray2D
 
 if TYPE_CHECKING:
     from mpi4py.MPI import Request
@@ -60,28 +59,16 @@ class MPIExchange:
 
             if Direction.NORTH in self.exists:
                 buffer = array.download_boundary(self.gpu_stream, "north")
-                exchanges.north = Exchange(CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                       0, 0, buffer),
-                                           CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                       0, 0, buffer))
+                exchanges.north = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
             if Direction.EAST in self.exists:
                 buffer = array.download_boundary(self.gpu_stream, "east")
-                exchanges.east = Exchange(CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                      0, 0, buffer),
-                                          CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                      0, 0, buffer))
+                exchanges.east = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
             if Direction.SOUTH in self.exists:
                 buffer = array.download_boundary(self.gpu_stream, "south")
-                exchanges.south = Exchange(CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                       0, 0, buffer),
-                                           CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                       0, 0, buffer))
+                exchanges.south = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
             if Direction.WEST in self.exists:
                 buffer = array.download_boundary(self.gpu_stream, "west")
-                exchanges.west = Exchange(CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                      0, 0, buffer),
-                                          CuPyArray2D(self.gpu_stream, buffer.shape[1], buffer.shape[0],
-                                                      0, 0, buffer))
+                exchanges.west = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
 
             self.exchange_arrays[array] = exchanges
 
@@ -112,8 +99,8 @@ class MPIExchange:
 
                 self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} ({direction.value}), "
                                   f"shape: {array_exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}.")
-                comm_send.append(self.comm.Isend(array_exchange.send.data, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(array_exchange.recv.data, source=exchange_rank, tag=recv_tag))
+                comm_send.append(self.comm.Isend(array_exchange.send, dest=exchange_rank, tag=send_tag))
+                comm_recv.append(self.comm.Irecv(array_exchange.recv, source=exchange_rank, tag=recv_tag))
 
         # Wait to receive all arrays
         for comm in comm_recv:
@@ -134,8 +121,8 @@ class MPIExchange:
 
 @dataclass
 class Exchange:
-    send: CuPyArray2D
-    recv: CuPyArray2D
+    send: cp.ndarray
+    recv: cp.ndarray
 
 
 @dataclass
@@ -152,13 +139,13 @@ class ArrayExchange:
         Updates the send arrays in each direction if there is one defined.
         """
         if self.north is not None:
-            self.array.download_boundary(gpu_stream, "south", data=self.north.send)
+            self.north.send = self.array.download_boundary(gpu_stream, "south")
         if self.east is not None:
-             self.array.download_boundary(gpu_stream, "east", data=self.east.send)
+            self.east.send = self.array.download_boundary(gpu_stream, "east")
         if self.south is not None:
-             self.array.download_boundary(gpu_stream, "north", data=self.south.send)
+            self.south.send = self.array.download_boundary(gpu_stream, "north")
         if self.west is not None:
-            self.array.download_boundary(gpu_stream, "west", data=self.west.send)
+            self.west.send = self.array.download_boundary(gpu_stream, "west")
 
         # gpu_stream.synchronize()
 
