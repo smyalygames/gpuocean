@@ -64,7 +64,7 @@ def convert_to_float32(data: npt.NDArray[np.float64 | np.float32]) -> npt.NDArra
     Returns:
         The same array in 32-bit floats.
     """
-    if not np.issubdtype(data.dtype, np.float32) or np.isfortran(data):
+    if not np.issubdtype(data.dtype, np.float32) or not data.flags['C_CONTIGUOUS']:
         return data.astype(np.float32, order='C')
     else:
         return data
