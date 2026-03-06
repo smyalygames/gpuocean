@@ -72,7 +72,7 @@ class CuPyArray2D(BaseArray2D):
         # Okay, everything is fine - issue device-to-device-copy:
         self.data = buffer.data
 
-    def download(self, gpu_stream: CuPyStream) -> np.ndarray:
+    def download(self, gpu_stream: CuPyStream) -> data_t:
         """
         Enables downloading data from GPU to Python
         Args:

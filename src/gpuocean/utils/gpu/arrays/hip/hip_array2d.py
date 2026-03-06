@@ -4,6 +4,12 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from hip import hip
 from hip._util.types import Pointer
+try:
+    import cupy as cp
+    from ..cupy.cupy_array2d import CuPyArray2D
+    has_cupy = True
+except ImportError:
+    has_cupy = False
 
 from ...hip_utils import hip_check
 from ..array2d import BaseArray2D
@@ -115,44 +121,54 @@ class HIPArray2D(BaseArray2D):
 
         return data
 
-    def upload_boundary(self, gpu_stream: HIPStream, data, direction) -> None:
+    def upload_boundary(self, gpu_stream: HIPStream, data: data_t | CuPyArray2D, direction) -> None:
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
-
-        if np.ma.is_masked(data):
-            self.mask = data.mask
-
-        # Make sure that the input is of correct size:
-        host_data = self._convert_to_precision(data)
 
         start, _ = self._get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 
         # Check that the shape is correct
-        if host_data.shape != shape:
+        if data.shape != shape:
             raise ValueError(f"The shape of the boundary data is not correct. Expected shape: {shape};"
-                             f" Shape of passed data: {host_data.shape}.")
+                             f" Shape of passed data: {data.shape}.")
 
-        # Parameters to copy to GPU memory
-        src = Host(data)
+        # TODO add logic for cp.ndarrays.
+        if self._check_array_device_to_device(data):
+            data: CuPyArray2D
+            src = Device(Pointer(data.pointer.ptr), data.pitch, data.dtype)
+        else:
+            # Make sure that the input is of correct size:
+            host_data = self._convert_to_precision(data)
+
+            # FIXME add the data to the boundary of the mask.
+            # if np.ma.is_masked(data):
+            #     self.mask = data.mask
+
+            # Parameters to copy to GPU memory
+            src = Host(host_data)
+
         dst = Device(self.pointer, self.pitch, self.dtype, x=start[1], y=start[0])
         transfer = Transfer(src, dst, shape[1] * self.bytes_per_float, shape[0])
         copy = transfer.get_transfer()
 
         hip_check(hip.hipMemcpyParam2DAsync(copy, gpu_stream.pointer))
 
-    def download_boundary(self, gpu_stream: HIPStream, direction) -> np.ndarray:
+    def download_boundary(self, gpu_stream: HIPStream, direction, data: CuPyArray2D=None) -> data_t | CuPyArray2D:
         if not self.holds_data:
             raise RuntimeError('HIP buffer has been freed.')
 
         start, _ = self._get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 
-        data = np.zeros(shape, dtype=self.dtype)
+        if data is None:
+            data = np.empty(shape, dtype=self.dtype)
+            dst = Host(data)
+        else:
+            dst = Device(Pointer(data.pointer.ptr), data.pitch, data.dtype)
 
         # Parameters to copy from GPU memory
         src = Device(self.pointer, self.pitch, self.dtype, x=start[1], y=start[0])
-        dst = Host(data)
         transfer = Transfer(src, dst, shape[1] * self.bytes_per_float, shape[0])
         copy = transfer.get_transfer()
 
@@ -164,3 +180,18 @@ class HIPArray2D(BaseArray2D):
         if self.holds_data:
             hip_check(hip.hipFree(self.data))
             self.holds_data = False
+
+    def _check_array_device_to_device(self, array) -> bool:
+        """
+        Checks if the data to upload is a CuPy array.
+        :param array: Array to check, should be either numpy or CuPy array.
+        :returns: `True` if it is a CuPy array, `False` if it is a numpy array.
+        """
+        if isinstance(array, CuPyArray2D):
+            return True
+        elif isinstance(array, np.ndarray):
+            # TODO implement direct CuPy array suppport
+            return False
+            return has_cupy and isinstance(array, cp.ndarray)
+        else:
+            raise RuntimeError("An incompatible array was attempted to be uploaded to device.")

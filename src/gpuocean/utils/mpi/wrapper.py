@@ -1,10 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from enum import IntEnum
-from dataclasses import dataclass
 import logging
 
 import numpy as np
+import numpy.typing as npt
 import cupy as cp
 from mpi4py import MPI
 
@@ -14,9 +13,9 @@ from gpuocean.SWEsimulators import SimulatorType
 from gpuocean.utils.dataclass import GhostCells
 
 from .grid import Grid
+from .exchange import MPIExchange
 
 if TYPE_CHECKING:
-    from mpi4py.MPI import Request
     from gpuocean.utils.types import AnySimulator
 
 
@@ -115,133 +114,17 @@ class MPIWrapper:
             self.sim.sim_writer.nc.boundary_conditions = str(boundary_conditions)
             self.sim.sim_writer.nc.boundary_conditions_sponge_mr = str(boundary_conditions.getSponge())
 
+        self.max_dt_buffer = cp.empty((1, 1), dtype=cp.float32)
+        self.global_dt = cp.empty_like(self.max_dt_buffer)
+
         # Check if dt needs to calculated
         if kwargs['dt'] <= 0:
             self.update_dt()
 
-        self.step_number = 0
-
-        # Create grid for domain decomposition
-
-        self.exists = {
-            Direction.NORTH: self.grid.north is not None,
-            Direction.EAST: self.grid.east is not None,
-            Direction.SOUTH: self.grid.south is not None,
-            Direction.WEST: self.grid.west is not None
-        }
-
-        self.exchange_arrays: dict[Array2D, ArrayExchange] = {}
-        self._prepare_exchanges()
-
-        self._exchange()
+        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm)
 
     def __getattr__(self, item):
         return getattr(self.sim, item)
-
-    def _prepare_exchanges(self):
-        """
-        Creates buffers for exchanging partial data between arrays.
-        """
-        arrays = self._get_domains()
-        for array in arrays:
-            exchanges = ArrayExchange()
-
-            if self.exists[Direction.NORTH]:
-                buffer = array.download_boundary(self.sim.gpu_stream, "north")
-                exchanges.north = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
-            if self.exists[Direction.EAST]:
-                buffer = array.download_boundary(self.sim.gpu_stream, "east")
-                exchanges.east = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
-            if self.exists[Direction.SOUTH]:
-                buffer = array.download_boundary(self.sim.gpu_stream, "south")
-                exchanges.south = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
-            if self.exists[Direction.WEST]:
-                buffer = array.download_boundary(self.sim.gpu_stream, "west")
-                exchanges.west = Exchange(cp.zeros_like(buffer), cp.zeros_like(buffer))
-
-            self.exchange_arrays[array] = exchanges
-
-        # Remove unused array
-        buffer = None
-
-    def _exchange(self):
-        """
-        Completes the MPI exchange for all the arrays.
-        """
-        self.sim.gpu_stream.synchronize()
-
-        for array in self._get_domains():
-            # Prepare the data
-            comm_send: list[Request] = []
-            comm_recv: list[Request] = []
-
-            # Shift by 2 bits
-            tag_pad = 4 * self.step_number
-
-            # Copy boundary data to buffer
-            self.exchange_arrays[array].prepare_send(array, self.sim.gpu_stream)
-
-            if self.exists[Direction.NORTH]:
-                exchange_rank = self.grid.north.rank
-                send_tag = tag_pad + Direction.NORTH
-                recv_tag = tag_pad + Direction.SOUTH
-                exchange = self.exchange_arrays[array].north
-
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (north), "
-                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
-
-                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
-            if self.exists[Direction.EAST]:
-                exchange_rank = self.grid.east.rank
-                send_tag = tag_pad + Direction.EAST
-                recv_tag = tag_pad + Direction.WEST
-                exchange = self.exchange_arrays[array].east
-
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (east), "
-                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
-
-                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
-            if self.exists[Direction.SOUTH]:
-                exchange_rank = self.grid.south.rank
-                send_tag = tag_pad + Direction.SOUTH
-                recv_tag = tag_pad + Direction.NORTH
-                exchange = self.exchange_arrays[array].south
-
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (south), "
-                                  f"shape: {exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}")
-
-                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=tag_pad + Direction.SOUTH))
-                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
-            if self.exists[Direction.WEST]:
-                exchange_rank = self.grid.west.rank
-                send_tag = tag_pad + Direction.WEST
-                recv_tag = tag_pad + Direction.EAST
-                exchange = self.exchange_arrays[array].west
-
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} (west), "
-                                  f"shape: {exchange.send.shape}, send tag: {send_tag} receive tag: {recv_tag}")
-
-                comm_send.append(self.comm.Isend(exchange.send, dest=exchange_rank, tag=send_tag))
-                comm_recv.append(self.comm.Irecv(exchange.recv, source=exchange_rank, tag=recv_tag))
-
-            # Do MPI exchange
-
-            # Wait for transfer to complete
-            for comm in comm_recv:
-                comm.wait()
-
-            self.logger.debug(f"Rank {self.comm.rank} received all data for transfer {self.step_number}")
-
-            self.exchange_arrays[array].upload_received(array, self.sim.gpu_stream)
-
-            # Wait for transfers to complete
-            for comm in comm_send:
-                comm.wait()
-
-            self.logger.debug(f"Rank {self.comm.rank} sent all data for transfer {self.step_number}")
-            self.step_number += 1
 
     def _get_domains(self) -> list[Array2D]:
         """
@@ -253,13 +136,14 @@ class MPIWrapper:
         t_now = 0.0
 
         if t_end == 0:
-            self._exchange()
+            self.mpi_handler.exchange()
             self.sim.step(t_end)
 
         while t_now < t_end:
-            self._exchange()
             if update_dt:
                 self.update_dt()
+
+            self.mpi_handler.exchange()
 
             t_now += self.sim.dt
             self.sim.step(self.sim.dt)
@@ -294,73 +178,49 @@ class MPIWrapper:
                                                     self.sim.gpu_stream,
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
-                                                     self.sim.max_dt_buffer.pointer])
+                                                     self.max_dt_buffer.data])
+        self.sim.gpu_stream.synchronize()
 
-        dt_host = self.sim.max_dt_buffer.download(self.gpu_stream)
+        self.comm.Allreduce(self.max_dt_buffer, self.global_dt, op=MPI.MIN)
 
-        global_dt_max = np.zeros(1, dtype=np.float32)
+        if self.global_dt == 0:
+            raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")
 
-        self.comm.Allreduce(dt_host, global_dt_max, op=MPI.MIN)
+        # TODO removed logging as it's unclear if it would degrade performance having to download from GPU.
+        # self.logger.debug(f"New dt is: {self.global_dt[0]}. Local dt was: {dt_host[0][0]}.")
 
-        if global_dt_max == 0:
-            raise RuntimeError("New timestep (dt) is zero.")
-
-        self.logger.debug(f"New dt is: {global_dt_max[0]}. Local dt was: {dt_host[0][0]}.")
-
-        self.sim.dt = courant_number * float(global_dt_max)
+        self.sim.dt = courant_number * float(self.global_dt)
 
     def cleanUp(self):
         self.sim.cleanUp()
 
-
-@dataclass
-class Exchange:
-    send: cp.ndarray
-    recv: cp.ndarray
-
-
-@dataclass
-class ArrayExchange:
-    north: Exchange | None = None
-    east: Exchange | None = None
-    south: Exchange | None = None
-    west: Exchange | None = None
-
-    def prepare_send(self, array: Array2D, gpu_stream):
+    def download(self, interior_domain_only=False, root: int = 0) -> tuple[
+                                                                         npt.NDArray, npt.NDArray, npt.NDArray] | None:
         """
-        Updates the send arrays in each direction if there is one defined.
+        Download the latest timestep from the GPU.
+        :param interior_domain_only: ``False`` to include ghost cells, and ``True`` to not include them in the download.
+        :param root: MPI rank to handle gathering all the domains.
+        :returns: An array with all the data on the nodes combined on the root MPI process, otherwise nothing.
         """
-        if self.north is not None:
-            self.north.send = array.download_boundary(gpu_stream, "south")
-        if self.east is not None:
-            self.east.send = array.download_boundary(gpu_stream, "east")
-        if self.south is not None:
-            self.south.send = array.download_boundary(gpu_stream, "north")
-        if self.west is not None:
-            self.west.send = array.download_boundary(gpu_stream, "west")
+        if not interior_domain_only:
+            raise NotImplementedError("Array gathering currently does not support the extra ghost cells.")
 
-        gpu_stream.synchronize()
+        eta_local, hu_local, hv_local = self.sim.download(interior_domain_only)
 
-    def upload_received(self, array: Array2D, gpu_stream):
-        """
-        Updates the array with all the received boundary data.
-        """
-        if self.north is not None:
-            array.upload_boundary(gpu_stream, self.north.recv, "south")
-        if self.east is not None:
-            array.upload_boundary(gpu_stream, self.east.recv, "east")
-        if self.south is not None:
-            array.upload_boundary(gpu_stream, self.south.recv, "north")
-        if self.west is not None:
-            array.upload_boundary(gpu_stream, self.west.recv, "west")
+        eta_arrays = self.comm.gather(eta_local, root=root)
+        hu_arrays = self.comm.gather(hu_local, root=root)
+        hv_arrays = self.comm.gather(hv_local, root=root)
+
+        if self.comm.rank == root:
+            eta = np.block(
+                [[eta_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
+            hu = np.block(
+                [[hu_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
+            hv = np.block(
+                [[hv_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
+
+            return eta, hu, hv
+        else:
+            return None
 
 
-class Direction(IntEnum):
-    """
-    Gives a direction for the MPI grid an assigned value.
-    Used for tagging.
-    """
-    NORTH = 0
-    EAST = 1
-    SOUTH = 2
-    WEST = 3

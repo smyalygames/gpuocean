@@ -2,6 +2,9 @@ from typing import Literal, ClassVar
 from dataclasses import dataclass, field
 import math
 
+from gpuocean.utils.enum import Direction
+
+
 
 @dataclass
 class Coordinate:
@@ -73,10 +76,10 @@ class Grid:
         Grid.y0, Grid.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
-        self.north = self.get_neighbor("north")
-        self.east = self.get_neighbor("east")
-        self.south = self.get_neighbor("south")
-        self.west = self.get_neighbor("west")
+        self.north = self.get_neighbor(Direction.NORTH)
+        self.east = self.get_neighbor(Direction.EAST)
+        self.south = self.get_neighbor(Direction.SOUTH)
+        self.west = self.get_neighbor(Direction.WEST)
 
     def _decompose_domain(self) -> tuple[int, int]:
         """
@@ -174,36 +177,36 @@ class Grid:
 
         return nx, ny
 
-    def get_neighbor(self, direction: Literal["north", "east", "south", "west"]) -> Coordinate | None:
+    def get_neighbor(self, direction: Direction) -> Coordinate | None:
         """
         Gets the coordinate of the neighboring process.
         This function would be useful for data exchanges.
         :param direction: Direction for the neighboring cell.
         :returns: Coordinate of the next cell over. None if there does not exist a neighbor in that direction.
         """
-        match str(direction):
-            case "north":
+        match direction:
+            case Direction.NORTH:
                 new_y = self.location.y + 1
                 # Check if the new y location goes out of bounds of the grid
                 if new_y >= self.nodes_y:
                     return None
 
                 return Coordinate(self.location.x, new_y)
-            case "south":
+            case Direction.SOUTH:
                 # Check if the current rank is in the southernly most point
                 if self.location.y == 0:
                     return None
 
                 new_y = self.location.y - 1
                 return Coordinate(self.location.x, new_y)
-            case "east":
+            case Direction.EAST:
                 new_x = self.location.x + 1
                 # Check if the new x location goes out of bounds of the grid
                 if new_x >= self.nodes_x:
                     return None
 
                 return Coordinate(new_x, self.location.y)
-            case "west":
+            case Direction.WEST:
                 # Checks if the current location is in the westerly most position already
                 if self.location.x == 0:
                     return None
