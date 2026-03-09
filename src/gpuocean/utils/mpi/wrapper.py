@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import numpy.typing as npt
 import cupy as cp
+from cupy.cuda import nccl
 from mpi4py import MPI
 
 from gpuocean.utils.gpu import Array2D
@@ -120,7 +121,15 @@ class MPIWrapper:
         if kwargs['dt'] <= 0:
             self.update_dt()
 
-        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm)
+        # Only use NCCL when each MPI rank has its own GPU device;
+        # NCCL does not support multiple ranks sharing the same device.
+        from gpuocean.utils.gpu import gpu_device
+        nccl_id = None
+        if gpu_device.get_device_count() >= self.comm.size:
+            if self.comm.rank == 0:
+                nccl_id = nccl.get_unique_id()
+            nccl_id = self.comm.bcast(nccl_id, root=0)
+        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id)
 
     def __getattr__(self, item):
         return getattr(self.sim, item)
@@ -178,9 +187,11 @@ class MPIWrapper:
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
                                                      self.sim.max_dt_buffer.pointer])
-        self.sim.gpu_stream.synchronize()
-
-        self.comm.Allreduce(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
+        if self.mpi_handler.nccl_comm is None:
+            self.sim.gpu_stream.synchronize()
+            self.comm.Allreduce(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
+        else:
+            self.mpi_handler.nccl_comm.allReduce(self.sim.max_dt_buffer.data.data.ptr, self.global_dt.data.ptr, 1, nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.gpu_stream._cupy_stream.ptr)
 
         if self.global_dt == 0:
             raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")
