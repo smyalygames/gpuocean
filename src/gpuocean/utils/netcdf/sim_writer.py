@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 import os
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 from git import Repo, InvalidGitRepositoryError, GitError
 from netCDF4 import Dataset
@@ -28,7 +29,8 @@ class SimNetCDFWriter:
     def __init__(self, sim: AnySimulator,
                  super_dir: Optional[str | os.PathLike[str]] = None, filename: Optional[str] = None,
                  num_layers: int = 1, staggered_grid: bool = False, ignore_ghostcells: Optional[bool] = False,
-                 offset_x: int = 0, offset_y: int = 0):
+                 offset_x: int = 0, offset_y: int = 0,
+                 write_parallel: bool = True, write_async: bool = True):
         """
         Writes simulator output to a netCDF file.
         :param sim: Simulator that will be used for the netCDF output.
@@ -41,6 +43,8 @@ class SimNetCDFWriter:
             The offset is `offset_x * dx`.
         :param offset_x: Offset y-axis from the origin of the simulator in the netCDF file.
             The offset is `offset_y * dx`.
+        :param write_parallel: Writes data in parallel for a timestep using HDF5 and MPI.
+        :param write_async: Makes each call to `self.write_timestep` asynchronous.
         """
 
         self.logger = logging.getLogger(__name__)
@@ -48,7 +52,11 @@ class SimNetCDFWriter:
 
         # Parallel netCDF4 write?
         # TODO: Implement check/test for feature or take as an argument
-        self.write_parallel = True
+        self.write_parallel = write_parallel
+
+        # Asynchronous writes
+        self.write_async = write_async
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
         # GPU compute queue:
         self.gpu_stream = sim.gpu_stream
@@ -369,7 +377,12 @@ class SimNetCDFWriter:
         eta, hu, hv = sim.download()
         time = sim.t
 
-        self.write(time, eta, hu, hv)
+        args=(time, eta, hu, hv)
+
+        if self.write_async:
+            self.executor.submit(self.write, *args)
+        else:
+            self.write(*args)
 
     def write(self, t: int | float, eta: npt.NDArray, hu: npt.NDArray, hv: npt.NDArray,
               eta2: Optional[npt.NDArray] = None, hu2: Optional[npt.NDArray] = None,
