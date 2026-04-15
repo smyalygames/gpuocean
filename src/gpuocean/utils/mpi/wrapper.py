@@ -8,7 +8,7 @@ import cupy as cp
 from cupy.cuda import nccl
 from mpi4py import MPI
 
-from gpuocean.utils.gpu import Array2D
+from gpuocean.utils.gpu import Array2D, GPUHandler
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 from gpuocean.SWEsimulators import SimulatorType
 from gpuocean.utils.dataclass import GhostCells
@@ -18,6 +18,7 @@ from .exchange import MPIExchange
 
 if TYPE_CHECKING:
     from gpuocean.utils.types import AnySimulator
+    from hip._util import types
 
 
 class MPIWrapper:
@@ -27,7 +28,7 @@ class MPIWrapper:
 
     def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
                  ghost_cells: tuple[int, int, int, int],
-                 comm=MPI.COMM_WORLD, boundary_conditions=BoundaryConditions(), *args, **kwargs):
+                 comm=MPI.COMM_WORLD, use_nccl=False, boundary_conditions=BoundaryConditions(), *args, **kwargs):
         """
         Creates a wrapper for the simulator, and the simulator chosen.
         :param simulator_type: Simulator type to create from the given arguments.
@@ -35,6 +36,7 @@ class MPIWrapper:
         :param global_ny: Size of the global domain in the y-axis.
         :param ghost_cells: A tuple consisting of the number of ghost cells in the directions of (north, east, south, west).
         :param comm: MPI interface.
+        :param use_nccl: Set to `True` to use NCCL, otherwise MPI will be used.
         :param args: Positional arguments for the specified simulator.
         :param kwargs: Keyword arguments for the specified simulator.
         """
@@ -108,6 +110,11 @@ class MPIWrapper:
                 elif value.shape == (original_shape[0] + 1, original_shape[1] + 1):
                     kwargs[key] = value[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
 
+        update_dt = False
+        if kwargs['dt'] <= 0:
+            update_dt = True
+            kwargs['dt'] = 1
+
         # Create the simulator
         self.sim: AnySimulator = simulator_type.value(*args, **kwargs)
         # Write the global boundary conditions to netCDF
@@ -117,19 +124,21 @@ class MPIWrapper:
 
         self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
 
-        # Check if dt needs to calculated
-        if kwargs['dt'] <= 0:
-            self.update_dt()
-
         # Only use NCCL when each MPI rank has its own GPU device;
         # NCCL does not support multiple ranks sharing the same device.
         from gpuocean.utils.gpu import gpu_device
         nccl_id = None
-        if gpu_device.get_device_count() >= self.comm.size:
+        if gpu_device.get_device_count() >= self.comm.size and use_nccl:
             if self.comm.rank == 0:
                 nccl_id = nccl.get_unique_id()
             nccl_id = self.comm.bcast(nccl_id, root=0)
-        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id)
+        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id, use_mpi=not use_nccl)
+        # Add exchange function to GPUHandler
+        GPUHandler.mpi_exchange_func = self.exchange_pointers
+
+        # Check if dt needs to calculated
+        if update_dt:
+            self.update_dt()
 
     def __getattr__(self, item):
         return getattr(self.sim, item)
@@ -144,14 +153,11 @@ class MPIWrapper:
         t_now = 0.0
 
         if t_end == 0:
-            self.mpi_handler.exchange()
             self.sim.step(t_end)
 
         while t_now < t_end:
             if update_dt:
                 self.update_dt()
-
-            self.mpi_handler.exchange()
 
             t_now += self.sim.dt
             self.sim.step(self.sim.dt)
@@ -187,11 +193,14 @@ class MPIWrapper:
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
                                                      self.sim.max_dt_buffer.pointer])
-        if self.mpi_handler.nccl_comm is None:
+        if self.mpi_handler.nccl_comm is not None:
+            self.mpi_handler.nccl_comm.allReduce(self.sim.max_dt_buffer.data.data.ptr, self.global_dt.data.ptr, 1,
+                                                 nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.sim.gpu_stream._cupy_stream.ptr)
+        elif self.mpi_handler.nccl is not None:
+            self.mpi_handler.nccl.all_reduce(self.sim.max_dt_buffer.data, self.global_dt, 'min', self.sim.gpu_stream._cupy_stream)
+        else:
             self.sim.gpu_stream.synchronize()
             self.comm.Allreduce(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
-        else:
-            self.mpi_handler.nccl_comm.allReduce(self.sim.max_dt_buffer.data.data.ptr, self.global_dt.data.ptr, 1, nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.gpu_stream._cupy_stream.ptr)
 
         if self.global_dt == 0:
             raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")
@@ -200,6 +209,15 @@ class MPIWrapper:
         # self.logger.debug(f"New dt is: {self.global_dt[0]}. Local dt was: {dt_host[0][0]}.")
 
         self.sim.dt = courant_number * float(self.global_dt)
+
+    def exchange_pointers(self, pointers: list[types.Pointer | cp.cuda.MemoryPointer]) -> None:
+        """
+        Exchanges a set `Array2D`s from their pointers.
+        :param pointers: Pointers to the Array2D class.
+        """
+        arrays = [array for array in self.mpi_handler.exchange_arrays.keys() if array.pointer in pointers]
+
+        self.mpi_handler.exchange(arrays)
 
     def cleanUp(self):
         self.sim.cleanUp()
