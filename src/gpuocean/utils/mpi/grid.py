@@ -157,8 +157,8 @@ class Grid:
         :param y_pos: Position of the node in relation to the other nodes globally in the y-axis.
         :returns: Size of the subdomain in the x- and y-axis respectively.
         """
-        x_remainder = (self.global_nx - x_pos) % self.nodes_x
-        y_remainder = (self.global_ny - y_pos) % self.nodes_y
+        x_remainder =  x_pos % self.nodes_x
+        y_remainder = y_pos % self.nodes_y
 
         # Calculate the size of the subdomain
         nx = self.global_nx / self.nodes_x
@@ -166,14 +166,14 @@ class Grid:
 
         # Account for decimals
         if x_remainder == 0:
-            nx = math.floor(nx)
-        else:
             nx = math.ceil(nx)
+        else:
+            nx = math.floor(nx)
 
         if y_remainder == 0:
-            ny = math.floor(ny)
-        else:
             ny = math.ceil(ny)
+        else:
+            ny = math.floor(ny)
 
         return nx, ny
 
