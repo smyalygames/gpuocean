@@ -9,8 +9,10 @@ class HIPStream(Stream):
     An object to handle HIP Streams
     """
 
-    def __init__(self):
+    def __init__(self, default_stream=True):
         self._stream: hip.ihipStream_t = hip_check(hip.hipStreamCreate())
+
+        super().__init__(default_stream)
 
     def synchronize(self):
         """

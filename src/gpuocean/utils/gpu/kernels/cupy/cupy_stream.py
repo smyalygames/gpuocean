@@ -8,10 +8,12 @@ class CuPyStream(HIPStream):
     An object to handle CuPy Streams
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, default_stream=True):
+        super().__init__(False)
         self._cupy_stream: cp.cuda.ExternalStream = cp.cuda.ExternalStream(int(self._stream))
-        self._cupy_stream.use()
+
+        if default_stream:
+            self.make_default()
 
     def destroy(self):
         """
@@ -19,3 +21,6 @@ class CuPyStream(HIPStream):
         """
         cp.cuda.Stream.null.use()
         super().destroy()
+
+    def make_default(self):
+        self._cupy_stream.use()

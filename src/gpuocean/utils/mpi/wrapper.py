@@ -8,7 +8,7 @@ import cupy as cp
 from cupy.cuda import nccl
 from mpi4py import MPI
 
-from gpuocean.utils.gpu import Array2D, GPUHandler
+from gpuocean.utils.gpu import Array2D, GPUHandler, GPUStream
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
 from gpuocean.SWEsimulators import SimulatorType
 from gpuocean.utils.dataclass import GhostCells
@@ -117,7 +117,9 @@ class MPIWrapper:
             self.sim.sim_writer.nc.boundary_conditions = str(boundary_conditions)
             self.sim.sim_writer.nc.boundary_conditions_sponge_mr = str(boundary_conditions.getSponge())
 
-        self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
+        self.dt_stream = GPUStream(default_stream=False)
+        with self.dt_stream._cupy_stream:
+            self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
 
         if self.total_nodes > 1:
             # Only use NCCL when each MPI rank has its own GPU device;
@@ -183,11 +185,11 @@ class MPIWrapper:
             self.sim.step(t_end)
 
         while t_now < t_end:
-            if update_dt:
-                self.update_dt()
-
             t_now += self.sim.dt
             self.sim.step(self.sim.dt)
+
+            if update_dt:
+                self.update_dt()
 
     def update_dt(self, courant_number: float = None):
         """
@@ -203,7 +205,7 @@ class MPIWrapper:
         if courant_number is None:
             courant_number = self.sim.courant_number
 
-        self.sim.per_block_max_dt_kernel.async_call(self.sim.global_size, self.sim.local_size, self.sim.gpu_stream,
+        self.sim.per_block_max_dt_kernel.async_call(self.sim.global_size, self.sim.local_size, self.dt_stream,
                                                     [self.sim.nx, self.sim.ny,
                                                      self.sim.dx, self.sim.dy,
                                                      self.sim.g,
@@ -216,7 +218,7 @@ class MPIWrapper:
 
         self.sim.max_dt_reduction_kernel.async_call((1, 1),
                                                     (self.sim.num_threads_dt, 1, 1),
-                                                    self.sim.gpu_stream,
+                                                    self.dt_stream,
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
                                                      self.sim.max_dt_buffer.pointer])
@@ -224,20 +226,21 @@ class MPIWrapper:
             pass
         elif self.mpi_handler.nccl_comm is not None:
             self.mpi_handler.nccl_comm.allReduce(self.sim.max_dt_buffer.data.data.ptr, self.global_dt.data.ptr, 1,
-                                                 nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.sim.gpu_stream._cupy_stream.ptr)
+                                                 nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.device_dt._cupy_stream.ptr)
         elif self.mpi_handler.nccl is not None:
-            self.mpi_handler.nccl.all_reduce(self.sim.max_dt_buffer.data, self.global_dt, 'min', self.sim.gpu_stream._cupy_stream)
+            self.mpi_handler.nccl.all_reduce(self.sim.max_dt_buffer.data, self.global_dt, 'min', self.device_dt._cupy_stream)
         else:
-            self.sim.gpu_stream.synchronize()
+            self.dt_stream.synchronize()
             self.comm.Allreduce(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
 
-        if self.global_dt == 0:
-            raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")
+        with self.device_dt._cupy_stream:
+            if self.global_dt == 0:
+                raise RuntimeError(f"New timestep (dt) is zero. Received: {self.global_dt}, Local: {self.max_dt_buffer}")
 
-        # TODO removed logging as it's unclear if it would degrade performance having to download from GPU.
-        # self.logger.debug(f"New dt is: {self.global_dt[0]}. Local dt was: {dt_host[0][0]}.")
+            # TODO removed logging as it's unclear if it would degrade performance having to download from GPU.
+            # self.logger.debug(f"New dt is: {self.global_dt[0]}. Local dt was: {dt_host[0][0]}.")
 
-        self.sim.dt = courant_number * float(self.global_dt)
+            self.sim.dt = courant_number * float(self.global_dt)
 
     def exchange_pointers(self, pointers: list[types.Pointer | cp.cuda.MemoryPointer]) -> None:
         """

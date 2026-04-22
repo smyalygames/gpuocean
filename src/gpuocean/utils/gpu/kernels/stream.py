@@ -10,6 +10,9 @@ class Stream(ABC):
     """
     A base class to handle streams for each GPU platform.
     """
+    def __init__(self, default_stream=True):
+        if default_stream:
+            self.make_default()
 
     def __del__(self):
         self.destroy()
@@ -27,6 +30,12 @@ class Stream(ABC):
     def synchronize(self) -> None:
         """
         Synchronize the GPU Stream
+        """
+
+    @abstractmethod
+    def make_default(self):
+        """
+        Makes the stream the default stream for functions that will be run.
         """
 
     @abstractmethod

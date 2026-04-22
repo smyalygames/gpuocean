@@ -21,14 +21,19 @@ class HIPHandler(BaseGPUHandler):
         grid = hip.dim3(*grid_size)
         block = hip.dim3(*block_size)
 
+        pointers: list[types.Pointer | cp.cuda.MemoryPointer] = []
+
         for i in range(len(args)):
             val = args[i]
             if isinstance(val, int):
                 args[i] = ctypes.c_int32(val)
             elif isinstance(val, float):
                 args[i] = ctypes.c_float(val)
+            elif isinstance(val, types.Pointer):
+                pointers.append(val)
             elif isinstance(val, cp.cuda.MemoryPointer):
                 args[i] = types.Pointer(val.ptr)
+                pointers.append(val)
 
         args = tuple(args)
 
@@ -36,6 +41,9 @@ class HIPHandler(BaseGPUHandler):
             hip_stream = stream.pointer
         else:
             hip_stream = None
+
+        # Exchange arrays before starting the kernel
+        self.exchange(pointers)
 
         hip_check(hip.hipModuleLaunchKernel(
             self.kernel,
