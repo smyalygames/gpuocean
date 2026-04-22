@@ -79,36 +79,31 @@ class MPIWrapper:
         kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm,
                        'boundary_conditions': local_boundary_conditions})
 
-        ghost_cells = GhostCells(*ghost_cells)
+        self.ghost_cells = GhostCells(*ghost_cells)
 
-        original_shape = (global_ny + ghost_cells.total_y, global_nx + ghost_cells.total_x)
+        self._original_shape = (self.global_ny + self.ghost_cells.total_y, self.global_nx + self.ghost_cells.total_x)
 
-        splice_x0 = self.grid.x0
-        splice_x1 = self.grid.x1 + ghost_cells.total_x
-        splice_y0 = self.grid.y0
-        splice_y1 = self.grid.y1 + ghost_cells.total_y
+        self._splice_x0 = self.grid.x0
+        self._splice_x1 = self.grid.x1 + self.ghost_cells.total_x
+        self._splice_y0 = self.grid.y0
+        self._splice_y1 = self.grid.y1 + self.ghost_cells.total_y
 
-        self.logger.debug(f"Splicing arrays with [{splice_y0}:{splice_y1}, {splice_x0}:{splice_x1}].")
+        self.logger.debug(
+            f"Splicing arrays with [{self._splice_y0}:{self._splice_y1}, {self._splice_x0}:{self._splice_x1}] Original sape: {self._original_shape}.")
 
         # Go through arrays in args
         args = list(args)
         for i in range(len(args)):
             var = args[i]
             if isinstance(var, np.ndarray):
-                if var.shape == original_shape:
-                    args[i] = var[splice_y0:splice_y1, splice_x0:splice_x1]
-                elif var.shape == (original_shape[0] + 1, original_shape[1] + 1):
-                    args[i] = var[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
+                args[i] = self._decompose_array(var)
 
         args = tuple(args)
 
         # Go through arrays in kwargs
         for key, value in kwargs.items():
             if isinstance(value, np.ndarray):
-                if value.shape == original_shape:
-                    kwargs[key] = value[splice_y0:splice_y1, splice_x0:splice_x1]
-                elif value.shape == (original_shape[0] + 1, original_shape[1] + 1):
-                    kwargs[key] = value[splice_y0:splice_y1 + 1, splice_x0:splice_x1 + 1]
+                kwargs[key] = self._decompose_array(value)
 
         update_dt = False
         if kwargs['dt'] <= 0:
@@ -139,6 +134,35 @@ class MPIWrapper:
         # Check if dt needs to calculated
         if update_dt:
             self.update_dt()
+
+    def _decompose_array(self, array: npt.NDArray) -> npt.NDArray:
+        """
+        Decomposes an array, also checks if the array is valid.
+        """
+        if array.shape == self._original_shape:
+            return array[self._splice_y0:self._splice_y1, self._splice_x0:self._splice_x1]
+        elif array.shape == (self._original_shape[0] + 1, self._original_shape[1] + 1):
+            return array[self._splice_y0:self._splice_y1 + 1, self._splice_x0:self._splice_x1 + 1]
+
+        # If the array is not something that can be decomposed, just return it anyway
+        return array
+
+    def reinit(self, eta: npt.NDArray, hu: npt.NDArray, hv: npt.NDArray, dt: float = 0):
+        """
+        Re-initializes the simulator to a given state.
+        """
+        eta_splice = self._decompose_array(eta)
+        hu_splice = self._decompose_array(hu)
+        hv_splice = self._decompose_array(hv)
+
+        # Upload data to simulator
+        self.sim.upload(eta_splice, hu_splice, hv_splice)
+        self.sim.t = 0
+        if dt <= 0:
+            self.update_dt()
+        else:
+            self.dt = dt
+
 
     def __getattr__(self, item):
         return getattr(self.sim, item)
