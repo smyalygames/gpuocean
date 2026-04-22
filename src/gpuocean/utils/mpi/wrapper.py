@@ -42,14 +42,14 @@ class MPIWrapper:
         """
         self.logger = logging.getLogger(__name__)
         self.comm = comm
-        total_nodes = self.comm.size
+        self.total_nodes = self.comm.size
         rank = self.comm.rank
 
-        self.logger.info(f"Rank: {rank}, Total Ranks: {total_nodes}.")
+        self.logger.info(f"Rank: {rank}, Total Ranks: {self.total_nodes}.")
 
         self.global_nx = global_nx
         self.global_ny = global_ny
-        self.grid = Grid(global_nx, global_ny, total_nodes, rank)
+        self.grid = Grid(global_nx, global_ny, self.total_nodes, rank)
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
@@ -119,17 +119,20 @@ class MPIWrapper:
 
         self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
 
-        # Only use NCCL when each MPI rank has its own GPU device;
-        # NCCL does not support multiple ranks sharing the same device.
-        from gpuocean.utils.gpu import gpu_device
-        nccl_id = None
-        if gpu_device.get_device_count() >= self.comm.size and use_nccl:
-            if self.comm.rank == 0:
-                nccl_id = nccl.get_unique_id()
-            nccl_id = self.comm.bcast(nccl_id, root=0)
-        self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id, use_mpi=not use_nccl)
-        # Add exchange function to GPUHandler
-        GPUHandler.mpi_exchange_func = self.exchange_pointers
+        if self.total_nodes > 1:
+            # Only use NCCL when each MPI rank has its own GPU device;
+            # NCCL does not support multiple ranks sharing the same device.
+            from gpuocean.utils.gpu import gpu_device
+            nccl_id = None
+            if gpu_device.get_device_count() >= self.comm.size and use_nccl:
+                if self.comm.rank == 0:
+                    nccl_id = nccl.get_unique_id()
+                nccl_id = self.comm.bcast(nccl_id, root=0)
+            self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id, use_mpi=not use_nccl)
+            # Add exchange function to GPUHandler
+            GPUHandler.mpi_exchange_func = self.exchange_pointers
+        else:
+            self.mpi_handler = None
 
         # Check if dt needs to calculated
         if update_dt:
@@ -217,7 +220,9 @@ class MPIWrapper:
                                                     [self.sim.num_blocks_dt,
                                                      self.sim.device_dt.pointer,
                                                      self.sim.max_dt_buffer.pointer])
-        if self.mpi_handler.nccl_comm is not None:
+        if self.mpi_handler is None:
+            pass
+        elif self.mpi_handler.nccl_comm is not None:
             self.mpi_handler.nccl_comm.allReduce(self.sim.max_dt_buffer.data.data.ptr, self.global_dt.data.ptr, 1,
                                                  nccl.NCCL_FLOAT32, nccl.NCCL_MIN, self.sim.gpu_stream._cupy_stream.ptr)
         elif self.mpi_handler.nccl is not None:
