@@ -58,7 +58,7 @@ class CuPyArray2D(BaseArray2D):
         self._check(host_data.shape, host_data.itemsize)
 
         # Copy data from CPU to GPU
-        self.data.set(data)
+        self.data.set(host_data)
 
     def copy_buffer(self, gpu_stream: CuPyStream, buffer: CuPyArray2D) -> None:
         if not self.holds_data:
