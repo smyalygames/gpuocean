@@ -1,4 +1,5 @@
 from typing import Literal, ClassVar
+from numbers import Number
 from dataclasses import dataclass, field
 import math
 
@@ -57,6 +58,7 @@ class Grid:
 
         # Subdomain grid size
         Grid.nodes_x, Grid.nodes_y = self._decompose_domain()
+        # Grid.nodes_x, Grid.nodes_y = (1, 16)
 
         Coordinate.nodes_x = self.nodes_x
         Coordinate.nodes_y = self.nodes_y
@@ -81,6 +83,20 @@ class Grid:
         self.south = self.get_neighbor(Direction.SOUTH)
         self.west = self.get_neighbor(Direction.WEST)
 
+    def _calculate_perimeter[T: int | float](self, x: T, y: T) -> T:
+        """
+        Calculates the perimeter of the exchange region from the global domain.
+        :param x: Splits in the x-axis for the global domain.
+        :param y: Splits in the y-axis for the global domain.
+        :returns: Perimeter from the splits in each axis.
+        """
+        if x < 1:
+            raise RuntimeError(f"`x` has to be greater than 1. Got {x}.")
+        if y < 1:
+            raise RuntimeError(f"`y` has to be greater than 1. Got {y}")
+
+        return (self.global_nx * (x - 1)) + (self.global_ny * (y - 1))
+
     def _decompose_domain(self) -> tuple[int, int]:
         """
         Decomposes the domain to a somewhat efficient order,
@@ -95,23 +111,37 @@ class Grid:
         if self.total_nodes == 1:
             return (1, 1)
 
-        # Get all the pairs of factors for total number of nodes
-        factors: list[tuple[int, int]] = []
-        for n in range(1, self.total_nodes + 1):
-            if self.total_nodes % n == 0:
-                factors.append((n, self.total_nodes // n))
+        x_ideal = math.sqrt((self.global_ny * self.total_nodes) / self.global_nx )
 
-        # Figure out which factor has the smallest exchange perimeter
-        best: tuple[int, int] = (0, 0)
-        best_perimeter: int | float = math.inf
+        # Find lower factor of ideal x
+        x_lower = int(x_ideal)
+        if x_lower == 0:
+            x_lower = 1
 
-        for pair in factors:
-            perimeter = (self.global_nx * (pair[0] - 1)) + (self.global_ny * (pair[1] - 1))
-            if perimeter < best_perimeter:
-                best = pair
-                best_perimeter = perimeter
+        while x_lower > 0:
+            if self.total_nodes % x_lower == 0:
+                break
+            x_lower -= 1
 
-        return best
+        # Find upper factor of ideal x
+        x_upper = math.ceil(x_ideal)
+        while x_upper <= self.total_nodes:
+            if self.total_nodes % x_upper == 0:
+                break
+            x_upper += 1
+
+        # Equivalent y-axes
+        y_lower = self.total_nodes // x_lower
+        y_upper = self.total_nodes // x_upper
+
+        # Calculate costs of the closest to ideal of x values
+        cost_lower = self._calculate_perimeter(x_lower, y_lower)
+        cost_upper = self._calculate_perimeter(x_upper, y_upper)
+        
+        if cost_lower <= cost_upper:
+            return x_lower, y_lower
+        else:
+            return x_upper, y_upper
 
     def _calculate_coordinate(self) -> Coordinate:
         """
