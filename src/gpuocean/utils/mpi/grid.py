@@ -189,18 +189,20 @@ class Grid:
         """
         x_remainder =  x_pos % self.nodes_x
         y_remainder = y_pos % self.nodes_y
+        nx_reminder = self.global_nx % self.nodes_x
+        ny_reminder = self.global_ny % self.nodes_y
 
         # Calculate the size of the subdomain
         nx = self.global_nx / self.nodes_x
         ny = self.global_ny / self.nodes_y
 
         # Account for decimals
-        if x_remainder == 0:
+        if x_remainder < nx_reminder:
             nx = math.ceil(nx)
         else:
             nx = math.floor(nx)
 
-        if y_remainder == 0:
+        if y_remainder < ny_reminder:
             ny = math.ceil(ny)
         else:
             ny = math.floor(ny)
