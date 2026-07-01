@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 import os
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from git import Repo, InvalidGitRepositoryError, GitError
 from netCDF4 import Dataset
@@ -14,6 +14,8 @@ from mpi4py import MPI
 from gpuocean.utils.mpi import Grid
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from netCDF4 import Variable
     import numpy.typing as npt
     from matplotlib.pyplot import Axes
@@ -30,7 +32,7 @@ class SimNetCDFWriter:
                  super_dir: Optional[str | os.PathLike[str]] = None, filename: Optional[str] = None,
                  num_layers: int = 1, staggered_grid: bool = False, ignore_ghostcells: Optional[bool] = False,
                  offset_x: int = 0, offset_y: int = 0,
-                 write_parallel: bool = True, write_async: bool = True):
+                 write_parallel: bool = True, write_async: bool = False):
         """
         Writes simulator output to a netCDF file.
         :param sim: Simulator that will be used for the netCDF output.
@@ -57,6 +59,7 @@ class SimNetCDFWriter:
         # Asynchronous writes
         self.write_async = write_async
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.futures: list[Future] = []
 
         # GPU compute queue:
         self.gpu_stream = sim.gpu_stream
@@ -226,13 +229,7 @@ class SimNetCDFWriter:
 
         # TODO continue filling out the rest of the attributes required.
 
-        forecast_group = self.nc.createGroup(f"forecasts/{self.sim_name}")
-        moment_group = forecast_group.createGroup("moments")
-        moment_u_group = moment_group.createGroup("u")
-        moment_v_group = moment_group.createGroup("v")
-
-        # Create netCDF dimensions and variables
-        forecast_group.createDimension('time', None)
+        self.forecast_group = self.nc.createGroup(f"forecasts/{self.sim_name}")
 
         nc_vars: dict[str, list[Variable]] = {'x': [], 'y': []}
         self.nc.createDimension('x', nx)
@@ -242,15 +239,20 @@ class SimNetCDFWriter:
 
         references_group = self.nc.createGroup("references")
 
+        if self.sim_name == 'FBL':
+            x_hu_nx = nx - 1
+        else:
+            x_hu_nx = nx + 1
+
+        self.create_uv_group = {
+            'create': False,
+            'u': (x_hu_nx, ny),
+            'v': (nx, ny + 1),
+
+        }
+
         if (not self.ignore_ghostcells) and self.staggered_grid:
-            if self.sim_name == 'FBL':
-                x_hu_nx = nx - 1
-            else:
-                x_hu_nx = nx + 1
-            moment_u_group.createDimension('x', x_hu_nx)
-            moment_u_group.createDimension('y', ny)
-            moment_v_group.createDimension('x', nx)
-            moment_v_group.createDimension('y', ny + 1)
+            self.create_uv_group['create'] = True
             nc_vars['x'].append(self.nc.createVariable('x', np.float64, ('x',)))
             nc_vars['y'].append(self.nc.createVariable('y', np.float64, ('y',)))
             nc_vars['x'].append(self.nc.createVariable('x', np.float64, ('x',)))
@@ -332,11 +334,52 @@ class SimNetCDFWriter:
                 Hi = Hi[:-1]
             self.Hi[self.y0:self.y1 + append_y, self.x0:self.x1 + append_x] = Hi
 
-        self.time = forecast_group.createVariable('time', np.float64, ('time',))
+        self.sim_reinit(sim)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.write_async:
+            self.executor.shutdown(wait=True)
+        self.logger.info(f"Closing netCDF file {self.filename}...")
+        self.nc.close()
+
+    def sync(self):
+        """
+        Synchronizes the separate thread for writing to netCDF.
+        """
+        if self.write_async:
+            return
+
+        wait(self.futures)
+        self.futures.clear()
+
+    def sim_reinit(self, sim: AnySimulator):
+        """
+        Called when reinitializing the simulator, so that it creates a new forecast group.
+        """
+        self.sync()
+
+        run_group = self.forecast_group.createGroup(f"run_{sim.init_count}")
+        moment_group = run_group.createGroup("moments")
+        moment_u_group = moment_group.createGroup("u")
+        moment_v_group = moment_group.createGroup("v")
+
+        # Create netCDF dimensions and variables
+        run_group.createDimension('time', None)
+
+        if self.create_uv_group['create']:
+            moment_u_group.createDimension('x', self.create_uv_group['u'][0])
+            moment_u_group.createDimension('y', self.create_uv_group['u'][1])
+            moment_v_group.createDimension('x', self.create_uv_group['v'][0])
+            moment_v_group.createDimension('y', self.create_uv_group['v'][1])
+
+        self.time = run_group.createVariable('time', np.float64, ('time',))
         self.time.units = 'seconds since 1970-01-01 00:00:00'
         self.time.set_collective(self.write_parallel)
 
-        self.eta = forecast_group.createVariable('eta', np.float32, ('time', 'y', 'x'), zlib=True)
+        self.eta = run_group.createVariable('eta', np.float32, ('time', 'y', 'x'), zlib=True)
         self.eta.set_collective(self.write_parallel)
         moment_dims = ('time', 'y', 'x')
         self.hu = moment_u_group.createVariable('hu', np.float32, moment_dims, zlib=True)
@@ -362,12 +405,7 @@ class SimNetCDFWriter:
         # Initial conditions of the simulator should be added as the first element to the above arrays
         self.write_timestep(sim)
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.logger.info(f"Closing netCDF file {self.filename}...")
-        self.nc.close()
 
     def write_timestep(self, sim: AnySimulator) -> None:
         """
@@ -380,7 +418,7 @@ class SimNetCDFWriter:
         args=(time, eta, hu, hv)
 
         if self.write_async:
-            self.executor.submit(self.write, *args)
+            self.futures.append(self.executor.submit(self.write, *args))
         else:
             self.write(*args)
 
