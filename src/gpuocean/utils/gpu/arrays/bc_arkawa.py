@@ -76,9 +76,9 @@ class BoundaryConditionsArakawaA:
                                       2, self.bc_data.east.h[0].shape[0], components,
                                       np.zeros((self.bc_data.east.h[0].shape[0], 2, components)))
 
-    """
-    Function which updates the external solution for the boundary conditions
-    """
+    @property
+    def arrays(self) -> tuple[Array3D]:
+        return self.bc_NS_current_arr, self.bc_NS_next_arr, self.bc_EW_current_arr, self.bc_EW_next_arr
 
     def update_bc_values(self, gpu_stream: GPUStream, t: float):
         # Only if we use flow relaxation

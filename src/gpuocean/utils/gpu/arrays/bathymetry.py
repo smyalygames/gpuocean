@@ -99,6 +99,13 @@ class Bathymetry:
                                 self.mask_value,
                                 self.Bm.pointer, self.Bm.pitch])
 
+    @property
+    def arrays(self) -> list[Array2D]:
+        """
+        Get a list of all GPU arrays used in this object.
+        """
+        return [self.Bi, self.Bm]
+
     def download(self, gpu_stream: GPUStream) -> (tuple[npt.NDArray, npt.NDArray] |
                                                   tuple[np.ma.MaskedArray, np.ma.MaskedArray]):
         Bm_cpu = self.Bm.download(gpu_stream)
