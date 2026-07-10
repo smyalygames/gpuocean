@@ -123,6 +123,7 @@ class Simulator(ABC):
         # Initialize time
         self.t = t
         self.num_iterations = 0
+        self.init_count = 0
         # Initialize wind stress parameters
         self.wind_stress_timestamps = {}
 
