@@ -211,7 +211,7 @@ class BoundaryConditionsArakawaA:
              self.halo_x, self.halo_y,
              h.pointer, h.pitch,
              u.pointer, u.pitch,
-             v.pointer, v.pitch])
+             v.pointer, v.pitch], exchange=False)
 
     def linear_interpolation_NS(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.linearInterpolation_NS.async_call(
@@ -223,7 +223,7 @@ class BoundaryConditionsArakawaA:
              self.boundary_conditions.spongeCells.south,
              h.pointer, h.pitch,
              u.pointer, u.pitch,
-             v.pointer, v.pitch])
+             v.pointer, v.pitch], exchange=False)
 
     def linear_interpolation_EW(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.linearInterpolation_EW.async_call(
@@ -235,7 +235,7 @@ class BoundaryConditionsArakawaA:
              self.boundary_conditions.spongeCells.west,
              h.pointer, h.pitch,
              u.pointer, u.pitch,
-             v.pointer, v.pitch])
+             v.pointer, v.pitch], exchange=False)
 
     def flow_relaxation_NS(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.flowRelaxationScheme_NS.async_call(
@@ -250,7 +250,7 @@ class BoundaryConditionsArakawaA:
              v.pointer, v.pitch,
              self.bc_NS_current_arr.pointer,
              self.bc_NS_next_arr.pointer,
-             self.bc_t])
+             self.bc_t], exchange=False)
 
     def flow_relaxation_EW(self, gpu_stream: GPUStream, h: Array3D, u: Array3D, v: Array3D):
         self.flowRelaxationScheme_EW.async_call(
@@ -265,4 +265,4 @@ class BoundaryConditionsArakawaA:
              v.pointer, v.pitch,
              self.bc_EW_current_arr.pointer,
              self.bc_EW_next_arr.pointer,
-             self.bc_t])
+             self.bc_t], exchange=False)

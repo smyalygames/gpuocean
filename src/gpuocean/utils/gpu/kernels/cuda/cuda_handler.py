@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 
 import numpy as np
 from pycuda import gpuarray
@@ -19,11 +19,11 @@ class CudaHandler(BaseGPUHandler):
         self.kernel = module.get_function(function)
         self.kernel.prepare(arguments)
 
-    def async_call(self, grid_size, block_size, stream, args: list):
+    def async_call(self, grid_size, block_size, stream, args: list, exchange=True, exchange_exclude: Iterable = None):
         # if len(args) != len(self.arguments):
         #     raise ValueError("The parameters do not match the defined arguments.")
 
         self.kernel.prepared_async_call(grid_size, block_size, stream, *args)
 
-    def call(self, grid_size, block_size: tuple[int, int, int], args: list):
+    def call(self, grid_size, block_size: tuple[int, int, int], args: list, exchange=True, exchange_exclude: Iterable = None):
         self.kernel.prepared_call(grid_size, block_size, *args)

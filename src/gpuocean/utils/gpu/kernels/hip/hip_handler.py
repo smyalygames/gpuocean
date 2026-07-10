@@ -1,5 +1,6 @@
 from __future__ import annotations
 import ctypes
+from collections.abc import Iterable
 
 import cupy as cp
 from hip import hip
@@ -17,11 +18,14 @@ class HIPHandler(BaseGPUHandler):
         self.kernel = hip_check(hip.hipModuleGetFunction(module, bytes(function, "utf-8")))
 
     def async_call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], stream: HIPStream | None,
-                   args: list):
+                   args: list, exchange=True, exchange_exclude: Iterable = None):
         grid = hip.dim3(*grid_size)
         block = hip.dim3(*block_size)
 
         pointers: list[types.Pointer | cp.cuda.MemoryPointer] = []
+
+        if exchange_exclude is None:
+            exchange_exclude = []
 
         for i in range(len(args)):
             val = args[i]
@@ -29,11 +33,12 @@ class HIPHandler(BaseGPUHandler):
                 args[i] = ctypes.c_int32(val)
             elif isinstance(val, float):
                 args[i] = ctypes.c_float(val)
-            elif isinstance(val, types.Pointer):
+            elif isinstance(val, types.Pointer) and val not in exchange_exclude:
                 pointers.append(val)
             elif isinstance(val, cp.cuda.MemoryPointer):
                 args[i] = types.Pointer(val.ptr)
-                pointers.append(val)
+                if val not in exchange_exclude:
+                    pointers.append(val)
 
         args = tuple(args)
 
@@ -41,9 +46,6 @@ class HIPHandler(BaseGPUHandler):
             hip_stream = stream.pointer
         else:
             hip_stream = None
-
-        # Exchange arrays before starting the kernel
-        self.exchange(pointers)
 
         hip_check(hip.hipModuleLaunchKernel(
             self.kernel,
@@ -55,5 +57,10 @@ class HIPHandler(BaseGPUHandler):
             extra=args
         ))
 
-    def call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], args: list):
-        self.async_call(grid_size, block_size, None, args)
+        # Exchange arrays after starting the kernel
+        if exchange:
+            self.exchange(pointers)
+
+    def call(self, grid_size: tuple[int, int], block_size: tuple[int, int, int], args: list,
+             exchange=True, exchange_exclude: Iterable = None):
+        self.async_call(grid_size, block_size, None, args, exchange, exchange_exclude)
