@@ -170,7 +170,15 @@ class MPIWrapper:
         if dt <= 0:
             self.update_dt()
         else:
-            self.dt = dt
+            self.sim.dt = dt
+
+        self.sim.num_iterations = 0
+        self.sim.wind_stress_timestamps = {}
+        self.sim.atmospheric_pressure_timestamps = {}
+        self.sim.init_count += 1
+
+        if self.sim.write_netcdf:
+            self.sim.sim_writer.sim_reinit(self.sim)
 
 
     def __getattr__(self, item):
