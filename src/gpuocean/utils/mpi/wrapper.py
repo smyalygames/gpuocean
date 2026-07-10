@@ -121,20 +121,36 @@ class MPIWrapper:
             self.sim.sim_writer.nc.boundary_conditions = str(boundary_conditions)
             self.sim.sim_writer.nc.boundary_conditions_sponge_mr = str(boundary_conditions.getSponge())
 
-        self.dt_stream = GPUStream(default_stream=False)
-        with self.dt_stream._cupy_stream:
-            self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
+        # self.dt_stream = GPUStream(default_stream=False)
+        # with self.dt_stream._cupy_stream:
+        self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
 
         if self.total_nodes > 1:
+            self.mpi_dt = None
             # Only use NCCL when each MPI rank has its own GPU device;
             # NCCL does not support multiple ranks sharing the same device.
             from gpuocean.utils.gpu import gpu_device
             nccl_id = None
-            if gpu_device.get_device_count() >= self.comm.size and use_nccl:
+            local_comm = self.comm.Split_type(MPI.COMM_TYPE_SHARED)
+            # For jobs with multiple nodes (not processes)
+            local_size = local_comm.Get_size()
+            local_comm.Free()
+
+            local_enough_gpus = 1 if gpu_device.get_device_count() >= local_size else 0
+
+            global_enough_gpus = self.comm.allreduce(local_enough_gpus, op=MPI.MIN)
+
+            if global_enough_gpus and use_nccl:
                 if self.comm.rank == 0:
                     nccl_id = nccl.get_unique_id()
                 nccl_id = self.comm.bcast(nccl_id, root=0)
-            self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(), self.comm, nccl_id, use_mpi=not use_nccl)
+            else:
+                if use_nccl:
+                    raise RuntimeError("Not enough GPUs allocated for each process.")
+                # self.mpi_dt: Prequest = self.comm.Allreduce_init(self.sim.max_dt_buffer.data, self.global_dt, op=MPI.MIN)
+                self.mpi_dt = None
+            self.mpi_handler = MPIExchange(self.sim.gpu_stream, self.grid, self._get_domains(),
+                                           self.comm, nccl_id, use_mpi=not use_nccl, mpi_persistent=mpi_persistent)
             # Add exchange function to GPUHandler
             GPUHandler.mpi_exchange_func = self.exchange_pointers
         else:
