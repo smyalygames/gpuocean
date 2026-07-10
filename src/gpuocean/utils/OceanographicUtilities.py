@@ -256,8 +256,8 @@ def minmodX(eta, theta=1.3):
 def rescaleMidpoints(data, nx1, ny1, **kwargs):
     ny0, nx0 = data.shape
 
-    nx1 = int(nx1)
-    ny1 = int(ny1)
+    nx1 = np.int32(nx1)
+    ny1 = np.int32(ny1)
     
     if (nx0 > nx1 and ny0 > ny1):
         # Subsample - non volume preserving        
@@ -293,8 +293,8 @@ def rescaleMidpoints(data, nx1, ny1, **kwargs):
 
         x1, y1 = np.meshgrid(x1, y1)
         
-        i = int(x1)
-        j = int(y1)
+        i = np.int32(x1)
+        j = np.int32(y1)
         
         s = x1 - (i+0.5)
         t = y1 - (j+0.5)
@@ -337,8 +337,8 @@ def rescaleIntersections(data, nx1, ny1, **kwargs):
         x1, y1 = np.meshgrid(x1, y1)
         
         #Get indices of four nearest neighbors
-        i = int(x1)
-        j = int(y1)
+        i = np.int32(x1)
+        j = np.int32(y1)
         k = np.minimum(i+1, nx0-1)
         l = np.minimum(j+1, ny0-1)
         
