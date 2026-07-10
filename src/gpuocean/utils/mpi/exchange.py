@@ -161,10 +161,11 @@ class MPIExchange:
             for direction in self.exists:
                 exchange_rank = self.grid.get_neighbor(direction).rank
                 send_tag, recv_tag = exchange.get_tags(self.step_number, self.total_arrays, direction)
-                array_exchange = self.exchange_arrays[array].get_direction(direction)
+                array_exchange = self.exchange_arrays[array][direction]
 
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} ({direction.value}), "
-                                  f"shape: {array_exchange.send.shape}, send tag: {send_tag}, receive tag: {recv_tag}.")
+                self.logger.debug("Sending from %d to %d (%s), "
+                                  f"shape: (%d, %d), send tag: %d, receive tag: %d.",
+                                  self.comm.rank, exchange_rank, direction.name, array_exchange.send.shape[0], array_exchange.send.shape[1], send_tag, recv_tag)
                 comm_send.append(self.comm.Isend(array_exchange.send, dest=exchange_rank, tag=send_tag))
                 comm_recv.append(self.comm.Irecv(array_exchange.recv, source=exchange_rank, tag=recv_tag))
 
@@ -172,7 +173,7 @@ class MPIExchange:
         for comm in comm_recv:
             comm.wait()
 
-        self.logger.debug(f"Rank {self.comm.rank} received all data for transfer {self.step_number}")
+        self.logger.debug("Rank %d received all data for transfer %d", self.comm.rank, self.step_number)
 
         for exchange in exchanges.values():
             exchange.upload_received(self.gpu_stream)
@@ -181,7 +182,7 @@ class MPIExchange:
         for comm in comm_send:
             comm.wait()
 
-        self.logger.debug(f"Rank {self.comm.rank} sent all data for transfer {self.step_number}")
+        self.logger.debug("Rank %d sent all data for transfer %d", self.comm.rank, self.step_number)
         self.step_number += 1
     def mpi_persistent_exchange(self, exchanges: dict[Array2D, MPIArrayExchange]):
         """
@@ -248,12 +249,13 @@ class MPIExchange:
                 exchange_rank = self.grid.get_neighbor(direction).rank
                 array_exchange = self.exchange_arrays[array].get_direction(direction)
 
-                self.logger.debug(f"Sending from {self.comm.rank} to {exchange_rank} ({direction.name}), "
-                                  f"shape: {array_exchange.send.shape}.")
+                self.logger.debug("Sending from %d to %d (%s), shape: (%d, %d).",
+                                  self.comm.rank, exchange_rank, direction.name,
+                                  array_exchange.send.shape[0], array_exchange.send.shape[1])
                 self.nccl.send_recv(array_exchange.send, array_exchange.recv, exchange_rank,
                                     self.gpu_stream._cupy_stream)
 
-        self.logger.debug(f"Rank {self.comm.rank} exchanged all data {self.step_number}")
+        self.logger.debug("Rank %d exchanged all data %d", self.comm.rank, self.step_number)
         self.step_number += 1
 
     def nccl_comm_exchange(self, exchanges: dict[Array2D, ArrayExchange]):
@@ -275,10 +277,10 @@ class MPIExchange:
         nccl.groupStart()
         index = 0
         for array, exchange in exchanges.items():
-            self.logger.debug(f"Starting NCCL exchange for {index}")
+            self.logger.debug("Starting NCCL exchange for %d", index)
             index += 1
             for direction in self.exists:
-                self.logger.debug(f"Exchanging for {direction.name}")
+                self.logger.debug("Exchanging for %s", direction.name)
                 exchange_rank = self.grid.get_neighbor(direction).rank
                 array_exchange = exchanges[array].get_direction(direction)
 
@@ -297,7 +299,7 @@ class MPIExchange:
 
         nccl.groupEnd()
 
-        self.logger.debug(f"Rank {self.comm.rank} completed NCCL exchange for transfer {self.step_number}")
+        self.logger.debug("Rank %d completed NCCL exchange for transfer %d", self.comm.rank, self.step_number)
         self.step_number += 1
 
 
