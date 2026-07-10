@@ -38,6 +38,17 @@ class CuPyArray2D(BaseArray2D):
     def pointer(self) -> Pointer:
         return self.data.data
 
+    def offset_pointer(self, offset: tuple[int, int]) -> cp.cuda.MemoryPointer:
+        """
+        Offset the memory pointer
+        :param offset: Offset of the memory pointer by element with (y, x).
+        :returns: Memory pointer with the offset.
+        """
+        y_offset, x_offset = offset
+        bytes_offset = (y_offset * self.pitch) + (x_offset * self.bytes_per_float)
+
+        return cp.cuda.MemoryPointer(self.data.data.mem, bytes_offset)
+
     @property
     def pitch(self):
         """
