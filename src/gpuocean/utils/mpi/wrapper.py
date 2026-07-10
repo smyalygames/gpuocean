@@ -206,15 +206,15 @@ class MPIWrapper:
         """
         return self.sim.arrays
 
-    def step(self, t_end=0.0, update_dt=False):
+    def step(self, t_end=0.0, update_dt=False, split_step=True):
         t_now = 0.0
 
         if t_end == 0:
-            self.sim.step(t_end)
+            self.sim.step(t_end, split_step=split_step)
 
         while t_now < t_end:
             t_now += self.sim.dt
-            self.sim.step(self.sim.dt)
+            self.sim.step(self.sim.dt, split_step=split_step)
 
             if update_dt:
                 self.update_dt()
