@@ -37,7 +37,7 @@ class Bathymetry:
         self.mask_value = 1.0e20
         self.use_mask = False
         if np.ma.is_masked(bi_host):
-            bi_host = bi_host.copy().filled(self.mask_value).astype(np.float32)
+            bi_host = bi_host.copy(order="C").filled(self.mask_value).astype(np.float32)
             self.use_mask = True
 
         # Check that Bi has the size corresponding to number of cell intersections
