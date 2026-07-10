@@ -10,15 +10,16 @@ from mpi4py import MPI
 
 from gpuocean.utils.gpu import Array2D, GPUHandler, GPUStream
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
-from gpuocean.SWEsimulators import SimulatorType
 from gpuocean.utils.dataclass import GhostCells
 
 from .grid import Grid
 from .exchange import MPIExchange
 
 if TYPE_CHECKING:
+    from gpuocean.SWEsimulators import SimulatorType
     from gpuocean.utils.types import AnySimulator
     from hip._util import types
+    from mpi4py.MPI import Prequest
 
 
 class MPIWrapper:
@@ -27,8 +28,8 @@ class MPIWrapper:
     """
 
     def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
-                 ghost_cells: tuple[int, int, int, int],
-                 comm=MPI.COMM_WORLD, use_nccl=False, boundary_conditions=BoundaryConditions(), *args, **kwargs):
+                 ghost_cells: tuple[int, int, int, int], strong_scale: bool = True,
+                 comm=MPI.COMM_WORLD, use_nccl=False, mpi_persistent=True, boundary_conditions=BoundaryConditions(), *args, **kwargs):
         """
         Creates a wrapper for the simulator, and the simulator chosen.
         :param simulator_type: Simulator type to create from the given arguments.
@@ -37,6 +38,7 @@ class MPIWrapper:
         :param ghost_cells: A tuple consisting of the number of ghost cells in the directions of (north, east, south, west).
         :param comm: MPI interface.
         :param use_nccl: Set to `True` to use NCCL, otherwise MPI will be used.
+        :param mpi_persistent: When using MPI, will use persistent connections.
         :param args: Positional arguments for the specified simulator.
         :param kwargs: Keyword arguments for the specified simulator.
         """
@@ -49,7 +51,7 @@ class MPIWrapper:
 
         self.global_nx = global_nx
         self.global_ny = global_ny
-        self.grid = Grid(global_nx, global_ny, self.total_nodes, rank)
+        self.grid = Grid(global_nx, global_ny, self.total_nodes, rank, strong_scale=strong_scale, use_nccl=use_nccl)
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
@@ -76,34 +78,36 @@ class MPIWrapper:
         local_boundary_conditions = BoundaryConditions(**boundary_conditions_args)
 
         # Decompose the information
-        kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny, 'comm': self.comm,
-                       'boundary_conditions': local_boundary_conditions})
+        kwargs.update({'comm': self.comm, 'boundary_conditions': local_boundary_conditions})
 
         self.ghost_cells = GhostCells(*ghost_cells)
 
         self._original_shape = (self.global_ny + self.ghost_cells.total_y, self.global_nx + self.ghost_cells.total_x)
 
-        self._splice_x0 = self.grid.x0
-        self._splice_x1 = self.grid.x1 + self.ghost_cells.total_x
-        self._splice_y0 = self.grid.y0
-        self._splice_y1 = self.grid.y1 + self.ghost_cells.total_y
+        if strong_scale:
+            kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny})
+            self.logger.debug(f"New nx: {self.grid.local_nx}, new ny: {self.grid.local_ny}")
+            self._splice_x0 = self.grid.x0
+            self._splice_x1 = self.grid.x1 + self.ghost_cells.total_x
+            self._splice_y0 = self.grid.y0
+            self._splice_y1 = self.grid.y1 + self.ghost_cells.total_y
 
-        self.logger.debug(
-            f"Splicing arrays with [{self._splice_y0}:{self._splice_y1}, {self._splice_x0}:{self._splice_x1}] Original sape: {self._original_shape}.")
+            self.logger.debug(
+                f"Splicing arrays with [{self._splice_y0}:{self._splice_y1}, {self._splice_x0}:{self._splice_x1}] Original sape: {self._original_shape}.")
 
-        # Go through arrays in args
-        args = list(args)
-        for i in range(len(args)):
-            var = args[i]
-            if isinstance(var, np.ndarray):
-                args[i] = self._decompose_array(var)
+            # Go through arrays in args
+            args = list(args)
+            for i in range(len(args)):
+                var = args[i]
+                if isinstance(var, np.ndarray):
+                    args[i] = self._decompose_array(var)
 
-        args = tuple(args)
+            args = tuple(args)
 
-        # Go through arrays in kwargs
-        for key, value in kwargs.items():
-            if isinstance(value, np.ndarray):
-                kwargs[key] = self._decompose_array(value)
+            # Go through arrays in kwargs
+            for key, value in kwargs.items():
+                if isinstance(value, np.ndarray):
+                    kwargs[key] = self._decompose_array(value)
 
         update_dt = False
         if kwargs['dt'] <= 0:

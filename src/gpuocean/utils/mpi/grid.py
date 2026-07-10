@@ -42,13 +42,14 @@ class Grid:
     y0: int
     y1: int
 
-    def __init__(self, nx: int, ny: int, total_nodes: int, rank: int):
+    def __init__(self, nx: int, ny: int, total_nodes: int, rank: int, strong_scale=True, use_nccl=False):
         """
         Creates a grid for the given domain.
         :param nx: Size of the domain in the x-axis.
         :param ny: Size of the domain in the y-axis.
         :param total_nodes: Total number of compute nodes.
         :param rank: Rank of this current process.
+        :param strong_scale: Decompose the domain in regard to strong scaling
         """
 
         Grid.global_nx = nx
@@ -57,8 +58,16 @@ class Grid:
         self.rank = rank
 
         # Subdomain grid size
-        Grid.nodes_x, Grid.nodes_y = self._decompose_domain()
-        # Grid.nodes_x, Grid.nodes_y = (1, 16)
+        if strong_scale:
+            Grid.nodes_x, Grid.nodes_y = self._decompose_domain()
+            # if not use_nccl:
+            #     Grid.nodes_x, Grid.nodes_y = self._decompose_domain()
+            # else:
+            #     Grid.nodes_x, Grid.nodes_y = (1, self.total_nodes)
+        else:
+            Grid.nodes_x, Grid.nodes_y = self._decompose_weak_domain()
+            Grid.global_nx = nx * Grid.nodes_x
+            Grid.global_ny = ny * Grid.nodes_y
 
         Coordinate.nodes_x = self.nodes_x
         Coordinate.nodes_y = self.nodes_y
@@ -69,7 +78,10 @@ class Grid:
         Grid.y_pos = self.location.y
 
         # Calculate the size of the local subdomain
-        self.local_nx, self.local_ny = self._calculate_subdomain_size(self.location.x, self.location.y)
+        if strong_scale:
+            self.local_nx, self.local_ny = self._calculate_subdomain_size(self.location.x, self.location.y)
+        else:
+            self.local_nx, self.local_ny = nx, ny
 
         # Provide the coordinates of the domain relative to the global domain
         # TODO replace nx with global nx, or have something to determine the type of domain decomposition
@@ -142,6 +154,22 @@ class Grid:
             return x_lower, y_lower
         else:
             return x_upper, y_upper
+
+    def _decompose_weak_domain(self):
+        """
+        Decomposes the domain in a weak fashion,
+        keeping the domain as a rectangle.
+        :returns: How many subdomains in the x- and y-axis respectively.
+        """
+        # Check that the total number of nodes is positive
+        if self.total_nodes < 1:
+            raise ValueError("There cannot be be zero or a negative number of total nodes.")
+
+        # Check that there are more than one node
+        if self.total_nodes == 1:
+            return (1, 1)
+
+        return (1, self.total_nodes)
 
     def _calculate_coordinate(self) -> Coordinate:
         """
