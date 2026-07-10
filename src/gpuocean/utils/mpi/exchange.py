@@ -156,9 +156,14 @@ class MPIExchange:
         comm_recv: list[Request] = []
 
         # Send MPI data.
+        RangePush("run/exchange/send")
         for array, exchange in exchanges.items():
+            RangePush(f"run/exchange/send/{exchange.index}")
 
             for direction in self.exists:
+                send_iteration = f"run/exchange/send/{exchange.index}/{direction.name.lower()}"
+                RangePush(send_iteration)
+
                 exchange_rank = self.grid.get_neighbor(direction).rank
                 send_tag, recv_tag = exchange.get_tags(self.step_number, self.total_arrays, direction)
                 array_exchange = self.exchange_arrays[array][direction]
@@ -166,24 +171,37 @@ class MPIExchange:
                 self.logger.debug("Sending from %d to %d (%s), "
                                   f"shape: (%d, %d), send tag: %d, receive tag: %d.",
                                   self.comm.rank, exchange_rank, direction.name, array_exchange.send.shape[0], array_exchange.send.shape[1], send_tag, recv_tag)
-                comm_send.append(self.comm.Isend(array_exchange.send, dest=exchange_rank, tag=send_tag))
+                RangePush(f"{send_iteration}/recv")
                 comm_recv.append(self.comm.Irecv(array_exchange.recv, source=exchange_rank, tag=recv_tag))
+                RangePop()
+                RangePush(f"{send_iteration}/send")
+                comm_send.append(self.comm.Isend(array_exchange.send, dest=exchange_rank, tag=send_tag))
+                RangePop()
+                RangePop()
 
+            RangePop()
+
+        RangePush("run/exchange/send/wait/recv")
         # Wait to receive all arrays
         for comm in comm_recv:
-            comm.wait()
+            comm.Wait()
+        RangePop()
 
         self.logger.debug("Rank %d received all data for transfer %d", self.comm.rank, self.step_number)
 
         for exchange in exchanges.values():
-            exchange.upload_received(self.gpu_stream)
+            exchange.upload_received(self.sim_stream)
 
         # Wait for transfers to complete
+        RangePush("run/exchange/send/wait/send")
         for comm in comm_send:
-            comm.wait()
+            comm.Wait()
+        RangePop()
 
         self.logger.debug("Rank %d sent all data for transfer %d", self.comm.rank, self.step_number)
         self.step_number += 1
+        RangePop()
+
     def mpi_persistent_exchange(self, exchanges: dict[Array2D, MPIArrayExchange]):
         """
         Uses persistent connections with mpi4py to exchange data between arrays.
@@ -247,13 +265,13 @@ class MPIExchange:
         for array, exchange in exchanges.items():
             for direction in self.exists:
                 exchange_rank = self.grid.get_neighbor(direction).rank
-                array_exchange = self.exchange_arrays[array].get_direction(direction)
+                array_exchange = self.exchange_arrays[array][direction]
 
                 self.logger.debug("Sending from %d to %d (%s), shape: (%d, %d).",
                                   self.comm.rank, exchange_rank, direction.name,
                                   array_exchange.send.shape[0], array_exchange.send.shape[1])
                 self.nccl.send_recv(array_exchange.send, array_exchange.recv, exchange_rank,
-                                    self.gpu_stream._cupy_stream)
+                                    self.sim_stream._cupy_stream)
 
         self.logger.debug("Rank %d exchanged all data %d", self.comm.rank, self.step_number)
         self.step_number += 1
@@ -262,6 +280,7 @@ class MPIExchange:
         """
         Uses the CuPy `NcclCommunicator` to communicate NCCL/RCCL exchanges.
         """
+        RangePush("run/exchange/send")
         self.logger.debug("Starting NCCL exchange")
         _NCCL_DTYPE_MAP = {
             cp.dtype('float32'): nccl.NCCL_FLOAT32,
@@ -269,20 +288,22 @@ class MPIExchange:
         }
 
         try:
-            stream_ptr = self.gpu_stream._cupy_stream.ptr
+            stream_ptr = self.sim_stream._cupy_stream.ptr
         except AttributeError:
             # Fallback if _cupy_stream is not available
-            stream_ptr = int(self.gpu_stream.pointer)
+            stream_ptr = int(self.sim_stream.pointer)
 
         nccl.groupStart()
         index = 0
         for array, exchange in exchanges.items():
+            RangePush(f"run/exchange/send/{exchange.index}")
             self.logger.debug("Starting NCCL exchange for %d", index)
             index += 1
             for direction in self.exists:
+                RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}")
                 self.logger.debug("Exchanging for %s", direction.name)
                 exchange_rank = self.grid.get_neighbor(direction).rank
-                array_exchange = exchanges[array].get_direction(direction)
+                array_exchange = exchanges[array][direction]
 
                 send_buf: cp.ndarray = array_exchange.send
                 recv_buf: cp.ndarray = array_exchange.recv
@@ -290,14 +311,26 @@ class MPIExchange:
                 nccl_dtype = _NCCL_DTYPE_MAP[send_buf.dtype]
 
                 self.logger.debug(
-                    f"NCCL sending from {self.comm.rank} to {exchange_rank} ({direction.value}), "
-                    f"shape: {send_buf.shape}."
+                    "NCCL sending from %d to %d (%s), shape: (%d, %d).",
+                    self.comm.rank, exchange_rank, direction.name, send_buf.shape[0], send_buf.shape[1]
                 )
 
+                RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}/send")
                 self.nccl_comm.send(send_buf.data.ptr, send_buf.size, nccl_dtype, exchange_rank, stream_ptr)
+                RangePop()
+                RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}/recv")
                 self.nccl_comm.recv(recv_buf.data.ptr, recv_buf.size, nccl_dtype, exchange_rank, stream_ptr)
+                RangePop()
+                RangePop()
+            RangePop()
 
         nccl.groupEnd()
+        RangePop()
+
+        RangePush("run/exchange/recv")
+        for exchange in exchanges.values():
+            exchange.upload_received(self.sim_stream)
+        RangePop()
 
         self.logger.debug("Rank %d completed NCCL exchange for transfer %d", self.comm.rank, self.step_number)
         self.step_number += 1
@@ -352,29 +385,47 @@ class ArrayExchange:
         """
         Updates the send arrays in each direction if there is one defined.
         """
+        RangePush(f"run/exchange/prepare/{self.index}")
         if self.north is not None and self.north.copy:
+            RangePush(f"run/exchange/prepare/{self.index}/north")
             cp.copyto(self.north.send, self.array.download_boundary(gpu_stream, "south", copy=False))
+            RangePop()
         if self.east is not None and self.east.copy:
+            RangePush(f"run/exchange/prepare/{self.index}/east")
             cp.copyto(self.east.send, self.array.download_boundary(gpu_stream, "east", copy=False))
+            RangePop()
         if self.south is not None and self.south.copy:
+            RangePush(f"run/exchange/prepare/{self.index}/south")
             cp.copyto(self.south.send, self.array.download_boundary(gpu_stream, "north", copy=False))
+            RangePop()
         if self.west is not None and self.west.copy:
+            RangePush(f"run/exchange/prepare/{self.index}/west")
             cp.copyto(self.west.send, self.array.download_boundary(gpu_stream, "west", copy=False))
-
-        # gpu_stream.synchronize()
+            RangePop()
+        RangePop()
 
     def upload_received(self, gpu_stream):
         """
         Updates the array with all the received boundary data.
         """
+        RangePush(f"run/exchange/send/upload/{self.index}")
         if self.north is not None and self.north.copy:
+            RangePush(f"run/exchange/send/upload/{self.index}/north")
             self.array.upload_boundary(gpu_stream, self.north.recv, "south")
+            RangePop()
         if self.east is not None and self.east.copy:
+            RangePush(f"run/exchange/send/upload/{self.index}/east")
             self.array.upload_boundary(gpu_stream, self.east.recv, "east")
+            RangePop()
         if self.south is not None and self.south.copy:
+            RangePush(f"run/exchange/send/upload/{self.index}/south")
             self.array.upload_boundary(gpu_stream, self.south.recv, "north")
+            RangePop()
         if self.west is not None and self.west.copy:
+            RangePush(f"run/exchange/send/upload/{self.index}/west")
             self.array.upload_boundary(gpu_stream, self.west.recv, "west")
+            RangePop()
+        RangePop()
 
     def __getitem__(self, item: Direction) -> Exchange | None:
         """
