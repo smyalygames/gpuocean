@@ -125,7 +125,7 @@ class HIPArray2D(BaseArray2D):
         if not self.holds_data:
             raise RuntimeError('The buffer has been freed before upload is called')
 
-        start, _ = self._get_boundary_coordinates(direction)
+        start, _ = self.get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 
         # Check that the shape is correct
@@ -158,7 +158,7 @@ class HIPArray2D(BaseArray2D):
         if not self.holds_data:
             raise RuntimeError('HIP buffer has been freed.')
 
-        start, _ = self._get_boundary_coordinates(direction)
+        start, _ = self.get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 
         if data is None:

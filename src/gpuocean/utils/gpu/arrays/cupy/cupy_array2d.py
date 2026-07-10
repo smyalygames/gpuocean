@@ -90,11 +90,15 @@ class CuPyArray2D(BaseArray2D):
 
         return data
 
-    def download_boundary(self, gpu_stream: CuPyStream, direction: direction_t) -> data_t:
+    def download_boundary(self, gpu_stream: CuPyStream, direction: direction_t, copy=False, ghost_cells=False) -> data_t:
+        """
+        Downloads a boundary
+
+        """
         if not self.holds_data:
             raise RuntimeError('CuPy buffer has been freed.')
 
-        start, end = self._get_boundary_coordinates(direction)
+        start, end = self.get_boundary_coordinates(direction)
         # shape = self._get_boundary_shape(direction)
 
         # FIXME add checks to make sure this does not overflow
@@ -111,10 +115,14 @@ class CuPyArray2D(BaseArray2D):
             start = (start[0], start[1] + self.halo_x)
             end = (end[0], end[1] + self.halo_x)
 
-        return self.data[start[0]:end[0], start[1]:end[1]].copy()
+        with gpu_stream._cupy_stream:
+            if copy:
+                return self.data[start[0]:end[0], start[1]:end[1]].copy()
+            else:
+                return self.data[start[0]:end[0], start[1]:end[1]]
 
     def upload_boundary(self, gpu_stream: CuPyStream, data: cp.ndarray, direction: direction_t) -> None:
-        start, end = self._get_boundary_coordinates(direction)
+        start, end = self.get_boundary_coordinates(direction)
         shape = self._get_boundary_shape(direction)
 
         # Check that the shape is correct

@@ -119,7 +119,7 @@ class BaseArray2D(ABC, Generic[T]):
         Frees the allocated memory buffers on the GPU
         """
 
-    def _get_boundary_coordinates(self, direction: direction_t) -> tuple[tuple[int, int], tuple[int, int]]:
+    def get_boundary_coordinates(self, direction: direction_t) -> tuple[tuple[int, int], tuple[int, int]]:
         """
         Gets the coordinates/shape of the boundary for the specified direction.
         :param direction: Part of the array to get the direction from.
@@ -127,11 +127,11 @@ class BaseArray2D(ABC, Generic[T]):
         """
         match direction:
             case "north":
-                return (0, 0), (self.halo_y, self.nx_halo)
+                return (self.halo_y + self.ny, 0), (self.ny_halo, self.nx_halo)
             case "east":
                 return (0, self.halo_x + self.nx), (self.ny_halo, self.nx_halo)
             case "south":
-                return (self.halo_y + self.ny, 0), (self.ny_halo, self.nx_halo)
+                return (0, 0), (self.halo_y, self.nx_halo)
             case "west":
                 return (0, 0), (self.ny_halo, self.halo_x)
             case _:
@@ -143,7 +143,7 @@ class BaseArray2D(ABC, Generic[T]):
         :param: What side of the array to get the shape of.
         :returns: Shape of the GPU array, (y, x), by the given side of the boundary.
         """
-        coordinates = self._get_boundary_coordinates(direction)
+        coordinates = self.get_boundary_coordinates(direction)
         shape = (coordinates[1][0] - coordinates[0][0], coordinates[1][1] - coordinates[0][1])
 
         return shape
