@@ -35,7 +35,7 @@ import gc
 import warnings
 import functools
 from enum import IntEnum
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 import numpy as np
 
@@ -276,6 +276,38 @@ class SpongeCells:
 
     def __str__(self):
         return f"SpongeCells: {{north: {self.north}, east: {self.east}, south: {self.south}, west: {self.west}}}"
+
+    def dict(self):
+        return {k: v for k, v in asdict(self).items()}
+
+    def keys(self):
+        return asdict(self).keys()
+
+    def __getitem__(self, item):
+        match item:
+            case 'north':
+                return self.north
+            case 'east':
+                return self.east
+            case 'south':
+                return self.south
+            case 'west':
+                return self.west
+            case _:
+                raise RuntimeError(f"{item} is an invalid direction to get a variable from.")
+
+    def __setitem__(self, key, value):
+        match key:
+            case 'north':
+                self.north = value
+            case 'east':
+                self.east = value
+            case 'south':
+                self.south = value
+            case 'west':
+                self.west = value
+            case _:
+                raise RuntimeError(f"Attempted to access invalid key, `{key}`, in {self.__class__.__name__}.")
 
 
 class BoundaryConditions:
