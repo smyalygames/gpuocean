@@ -38,6 +38,7 @@ import numpy.typing as npt
 
 from gpuocean.utils.netcdf import SimNetCDFWriter, SimNetCDFReader
 from gpuocean.SWEsimulators import Simulator
+from gpuocean.utils import WindStress, AtmosphericPressure
 from gpuocean.utils.Common import BoundaryConditions, BoundaryConditionsData
 from gpuocean.utils.gpu.arrays.bathymetry import Bathymetry
 from gpuocean.utils.gpu import GPUHandler, SWEDataArakawaA, BoundaryConditionsArakawaA
@@ -45,7 +46,6 @@ from gpuocean.utils.gpu import GPUHandler, SWEDataArakawaA, BoundaryConditionsAr
 if TYPE_CHECKING:
     from mpi4py import MPI
 
-    from gpuocean.utils import WindStress, AtmosphericPressure
     from gpuocean.utils.gpu import KernelContext
 
 
