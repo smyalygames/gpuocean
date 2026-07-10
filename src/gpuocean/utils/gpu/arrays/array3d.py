@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TypeVar, Generic, Union, TYPE_CHECKING
+from typing import TypeVar, Generic, Union, TYPE_CHECKING, Literal
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 T = TypeVar('T', np.float32, np.float64)
 data_t = Union[npt.NDArray[T], np.ma.MaskedArray]
+direction_t = Literal["north", "east", "south", "west"]
 
 
 class BaseArray3D(ABC, Generic[T]):
