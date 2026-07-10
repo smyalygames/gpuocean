@@ -372,9 +372,9 @@ class CDKLM16(Simulator.Simulator):
             self.model_time_step = self.dt
 
         if self.write_netcdf:
-            self.sim_writer = SimNetCDFWriter(self, super_dir_name=super_dir_name, filename=netcdf_filename,
-                                                        ignore_ghostcells=self.ignore_ghostcells,
-                                                        offset_x=self.offset_x, offset_y=self.offset_y)
+            self.sim_writer = SimNetCDFWriter(self, super_dir=super_dir_name, filename=netcdf_filename,
+                                              ignore_ghostcells=self.ignore_ghostcells,
+                                              offset_x=self.offset_x, offset_y=self.offset_y)
 
         # Update timestep if dt is given as zero
         if self.dt <= 0:
