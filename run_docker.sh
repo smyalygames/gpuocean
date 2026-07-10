@@ -10,7 +10,7 @@ docker run \
     --rm \
     --cap-add=SYS_PTRACE \
     --ipc=host \
-    --privileged=true \
+    --privileged=false \
     --user=1000 \
     --network=host \
     --device=/dev/kfd \
@@ -20,5 +20,8 @@ docker run \
     -v /app/.venv \
     -e ROCM_HOME=/opt/rocm \
     -p 12345:12345 \
-    $(docker build -q .) \
+    $INTERACTIVE \
+    smyalygames/gpuocean:0.0.13-lumi \
     "$@"
+
+    # $(docker build -q .)
