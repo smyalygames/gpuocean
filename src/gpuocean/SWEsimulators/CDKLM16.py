@@ -91,7 +91,8 @@ class CDKLM16(Simulator.Simulator):
                  one_dimensional=False,
                  flux_balancer=0.8,
                  block_width=12, block_height=32, num_threads_dt=256,
-                 use_direct_lookup=False):
+                 use_direct_lookup=False,
+                 compile_opts: list[str]=None):
         """
         Initialization routine
         Args:
@@ -281,27 +282,34 @@ class CDKLM16(Simulator.Simulator):
                    'USE_DIRECT_LOOKUP': use_direct_lookup
                    }
 
-        if one_dimensional:
-            defines['ONE_DIMENSIONAL'] = 1
+        if compile_opts is None:
+            compile_opts = []
+
+        compile_args = {  # default, fast_math, optimal
+            'cuda': {
+                'options': ["--ftz=true",  # false,   true,      true
+                        "--prec-div=false",  # true,    false,     false,
+                        "--prec-sqrt=false",  # true,    false,     false
+                        "--fmad=false"] + compile_opts,  # true,    true,      false
+
+                # 'options': ["--use_fast_math"]
+                # 'options': ["--generate-line-info"],
+                # nvcc_options=["--maxrregcount=39"],
+                # 'arch': "compute_50",
+                # 'code': "sm_50"
+            },
+            'hip': compile_opts
+        }
+
+        jit_compile_args = {
+            # jit_options=[(cuda.jit_option.MAX_REGISTERS, 39)]
+        }
 
         # Get kernels
         self.kernel = gpu_ctx.get_kernel("CDKLM16_kernel",
-                                         defines=defines,
-                                         compile_args={  # default, fast_math, optimal
-                                             'options': ["--ftz=true",  # false,   true,      true
-                                                         "--prec-div=false",  # true,    false,     false,
-                                                         "--prec-sqrt=false",  # true,    false,     false
-                                                         "--fmad=false"],  # true,    true,      false
-
-                                             # 'options': ["--use_fast_math"]
-                                             # 'options': ["--generate-line-info"],
-                                             # nvcc_options=["--maxrregcount=39"],
-                                             # 'arch': "compute_50",
-                                             # 'code': "sm_50"
-                                         },
-                                         jit_compile_args={
-                                             # jit_options=[(cuda.jit_option.MAX_REGISTERS, 39)]
-                                         }
+                                         defines=defines.default,
+                                         compile_args=compile_args,
+                                         jit_compile_args=jit_compile_args
                                          )
 
         # Get CUDA functions and define data types for prepared_{async_}call()
