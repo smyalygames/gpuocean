@@ -101,19 +101,20 @@ class CuPyArray2D(BaseArray2D):
         start, end = self.get_boundary_coordinates(direction)
         # shape = self._get_boundary_shape(direction)
 
-        # FIXME add checks to make sure this does not overflow
-        if direction == "north":
-            start = (start[0] + self.halo_y, start[1])
-            end = (end[0] + self.halo_y, end[1])
-        if direction == "east":
-            start = (start[0], start[1] - self.halo_x)
-            end = (end[0], end[1] - self.halo_x)
-        if direction == "south":
-            start = (start[0] - self.halo_y, start[1])
-            end = (end[0] - self.halo_y, end[1])
-        if direction == "west":
-            start = (start[0], start[1] + self.halo_x)
-            end = (end[0], end[1] + self.halo_x)
+        if not ghost_cells:
+            # FIXME add checks to make sure this does not overflow
+            if direction == "north":
+                start = (start[0] - self.halo_y, start[1])
+                end = (end[0] - self.halo_y, end[1])
+            if direction == "east":
+                start = (start[0], start[1] - self.halo_x)
+                end = (end[0], end[1] - self.halo_x)
+            if direction == "south":
+                start = (start[0] + self.halo_y, start[1])
+                end = (end[0] + self.halo_y, end[1])
+            if direction == "west":
+                start = (start[0], start[1] + self.halo_x)
+                end = (end[0], end[1] + self.halo_x)
 
         with gpu_stream._cupy_stream:
             if copy:
@@ -130,7 +131,8 @@ class CuPyArray2D(BaseArray2D):
             raise ValueError(f"The shape of the boundary data is not correct. Expected shape: {shape};"
                              f" Shape of passed data: {data.shape}.")
 
-        self.data[start[0]:end[0], start[1]:end[1]] = data
+        with gpu_stream._cupy_stream:
+            cp.copyto(self.data[start[0]:end[0], start[1]:end[1]], data)
 
     def release(self) -> None:
         if self.holds_data:
