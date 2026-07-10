@@ -68,6 +68,7 @@ class SimNetCDFWriter:
         self.ignore_ghostcells = ignore_ghostcells
         self.staggered_grid = staggered_grid
         self.num_layers = num_layers
+        self.comp_level = 4 # Default level
 
         self.text_pos = -1
 
@@ -310,7 +311,8 @@ class SimNetCDFWriter:
         self.land_mask[:] = 0
 
         ## Create bathymetry/equilibrium depth
-        self.Hm = references_group.createVariable('Hm', np.float32, ('y', 'x'), zlib=True)
+        self.Hm = references_group.createVariable('Hm', np.float32, ('y', 'x'),
+                                                  zlib=True, complevel=self.comp_level)
         self.Hm.standard_name = 'water_surface_reference_datum_altitude'
         self.Hm.grid_mapping = 'projection_stere'
         self.Hm.coordinates = 'y x'
@@ -319,7 +321,8 @@ class SimNetCDFWriter:
         self.Hm[self.y0:self.y1, self.x0:self.x1] = Hm
 
         if not self.staggered_grid:
-            self.Hi = Hi_group.createVariable("Hi", np.float32, ('y', 'x'), zlib=True)
+            self.Hi = Hi_group.createVariable("Hi", np.float32, ('y', 'x'),
+                                              zlib=True, complevel=self.comp_level)
             self.Hi.standard_name = 'water_surface_reference_datum_altitude'
             self.Hi.grid_mapping = 'projection_stere'
             self.Hi.coordinates = 'y x'
@@ -379,12 +382,15 @@ class SimNetCDFWriter:
         self.time.units = 'seconds since 1970-01-01 00:00:00'
         self.time.set_collective(self.write_parallel)
 
-        self.eta = run_group.createVariable('eta', np.float32, ('time', 'y', 'x'), zlib=True)
+        self.eta = run_group.createVariable('eta', np.float32, ('time', 'y', 'x'),
+                                            zlib=True, complevel=self.comp_level)
         self.eta.set_collective(self.write_parallel)
         moment_dims = ('time', 'y', 'x')
-        self.hu = moment_u_group.createVariable('hu', np.float32, moment_dims, zlib=True)
+        self.hu = moment_u_group.createVariable('hu', np.float32, moment_dims,
+                                                zlib=True, complevel=self.comp_level)
         self.hu.set_collective(self.write_parallel)
-        self.hv = moment_v_group.createVariable('hv', np.float32, moment_dims, zlib=True)
+        self.hv = moment_v_group.createVariable('hv', np.float32, moment_dims,
+                                                zlib=True, complevel=self.comp_level)
         self.hv.set_collective(self.write_parallel)
 
         self.eta.standard_name = 'water_surface_height_above_reference_datum'
