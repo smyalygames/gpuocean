@@ -81,6 +81,9 @@ class BoundaryConditionsArakawaA:
         return self.bc_NS_current_arr, self.bc_NS_next_arr, self.bc_EW_current_arr, self.bc_EW_next_arr
 
     def update_bc_values(self, gpu_stream: GPUStream, t: float):
+        """
+        Function which updates the external solution for the boundary conditions
+        """
         # Only if we use flow relaxation
         if not (self.boundary_conditions.north == BoundaryType.FLOW_RELAXATION_SCHEME or
                 self.boundary_conditions.south == BoundaryType.FLOW_RELAXATION_SCHEME or
