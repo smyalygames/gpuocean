@@ -2,19 +2,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable
 import logging
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from mpi4py import MPI
 import cupy as cp
 from cupy.cuda import nccl
 from cupyx.distributed import NCCLBackend
+from cupy.cuda.nvtx import RangePush, RangePop
 from hip._util import types
 
 from gpuocean.utils.enum import Direction
 
 if TYPE_CHECKING:
-    from mpi4py.MPI import Request
+    from mpi4py.MPI import Request, Prequest, Comm
     from gpuocean.utils.gpu import Array2D, Array3D, GPUStream
     from .grid import Grid
+    from concurrent.futures import Future
 
 
 class MPIExchange:
@@ -23,7 +26,7 @@ class MPIExchange:
     """
 
     def __init__(self, gpu_stream: GPUStream, grid: Grid, arrays: Iterable[Array2D], comm=MPI.COMM_WORLD,
-                 nccl_id: bytes = None, use_mpi=False, direct_exchange=False):
+                 nccl_id: bytes = None, use_mpi=False, mpi_persistent=True, direct_exchange=False):
         """
         Handler for exchanging data through CuPy using MPI.
         :param gpu_stream: GPU Stream for synchronizing arrays.
@@ -32,17 +35,21 @@ class MPIExchange:
         :param comm: MPI communicator for handling exchanges.
         :param: nccl_id: ID for `NcclCommunicator`.
         :param use_mpi: Use MPI instead of NCCL.
+        :param mpi_persistent: Use persistent MPI connections
         :param direct_exchange: Set to `True` to directly exchange arrays
         """
         self.logger = logging.getLogger(__name__)
         self.logger.info("Creating MPIExchange.")
 
         self.comm = comm
-        self.gpu_stream = gpu_stream
+        self.sim_stream = gpu_stream
+        # self.exchange_stream = GPUStream(default_stream=False)
         self.grid = grid
+        self.mpi_persistent = use_mpi and mpi_persistent
         self.using_nccl = True
         self.nccl: NCCLBackend | None = None
         self.nccl_comm: nccl.NcclCommunicator | None = None
+        self.mpi_executor: ThreadPoolExecutor | None = None
 
         if nccl_id is not None:
             rank = comm.rank
@@ -51,7 +58,10 @@ class MPIExchange:
         elif not use_mpi:
             self.nccl = NCCLBackend(comm.size, comm.rank)
 
-        self.logger.info(f"CuPy is using device {cp.cuda.runtime.getDevice()}.")
+        if use_mpi:
+            self.mpi_executor = ThreadPoolExecutor()
+
+        self.logger.info("CuPy is using device %d.", cp.cuda.runtime.getDevice())
 
         self.step_number = 0
 
@@ -66,67 +76,77 @@ class MPIExchange:
         if self.grid.west is not None:
             self.exists.append(Direction.WEST)
 
-        # Creates CuPy arrays for MPI exchanges.
-        self.exchange_arrays: dict[Array2D, ArrayExchange] = {}
-        for index, array in enumerate(arrays):
-            exchanges = ArrayExchange(index, array)
+        self.total_arrays = len(arrays)
 
-            if Direction.NORTH in self.exists:
-                send_buf = array.download_boundary(self.gpu_stream, "north", copy=False, ghost_cells=False)
-                recv_buf = array.download_boundary(self.gpu_stream, "north", copy=False, ghost_cells=True)
-                exchanges.north = Exchange(send_buf, recv_buf)
-            if Direction.EAST in self.exists:
-                send_buf = array.download_boundary(self.gpu_stream, "west", copy=False, ghost_cells=False)
-                recv_buf = array.download_boundary(self.gpu_stream, "west", copy=False, ghost_cells=True)
-                exchanges.east = Exchange(send_buf, recv_buf)
-            if Direction.SOUTH in self.exists:
-                send_buf = array.download_boundary(self.gpu_stream, "south", copy=False, ghost_cells=False)
-                recv_buf = array.download_boundary(self.gpu_stream, "south", copy=False, ghost_cells=True)
-                exchanges.south = Exchange(send_buf, recv_buf)
-            if Direction.WEST in self.exists:
-                send_buf = array.download_boundary(self.gpu_stream, "east", copy=False, ghost_cells=False)
-                recv_buf = array.download_boundary(self.gpu_stream, "east", copy=False, ghost_cells=True)
-                exchanges.west = Exchange(send_buf, recv_buf)
+        # Creates CuPy arrays for MPI exchanges.
+        self.exchange_arrays: dict[Array2D, ArrayExchange | MPIArrayExchange] = {}
+        for index, array in enumerate(arrays):
+            if self.mpi_persistent:
+                exchanges = MPIArrayExchange(index, array)
+            else:
+                exchanges = ArrayExchange(index, array)
+
+            for direction in self.exists:
+                download_direction = direction.name.lower()
+                send_buf = array.download_boundary(self.sim_stream, download_direction, copy=False, ghost_cells=False)
+                recv_buf = array.download_boundary(self.sim_stream, download_direction, copy=False, ghost_cells=True)
+
+                if self.mpi_persistent:
+                    exchange_rank = self.grid.get_neighbor(direction).rank
+                    send_tag, recv_tag = exchanges.get_tags(self.step_number, self.total_arrays, direction)
+                    exchanges[direction] = ExchangeMPI(send=send_buf, recv=recv_buf,
+                                                       send_tag=send_tag, recv_tag=recv_tag,
+                                                       comm=self.comm, rank=exchange_rank)
+                else:
+                    exchanges[direction] = Exchange(send_buf, recv_buf)
 
             self.exchange_arrays[array] = exchanges
-
-        self.total_arrays = len(self.exchange_arrays)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.nccl_comm is not None:
             self.nccl_comm.destroy()
         if self.nccl is not None:
             self.nccl.stop()
+        if self.mpi_executor is not None:
+            self.mpi_executor.shutdown()
 
-    def _prepare_exchanges(self, exchanges: dict[Array2D, ArrayExchange] = None):
+    def _prepare_exchanges(self, gpu_stream: GPUStream, exchanges: dict[Array2D, ArrayExchange] = None):
         """
         Prepares an exchange for use in MPI or NCCL.
         """
         if exchanges is None:
             exchanges = self.exchange_arrays.items()
 
-        for array, exchange in exchanges:
-            exchange.prepare_send(self.gpu_stream)
+        for array, exchange in exchanges.items():
+            exchange.prepare_send(gpu_stream)
 
     def exchange(self, arrays: list[Array2D] = None):
         """
         Completes the MPI exchange for all the arrays.
         """
+        RangePush("run/exchange")
 
         if arrays is not None:
             exchange_arrays = {array: self.exchange_arrays[array] for array in arrays if array in self.exchange_arrays}
         else:
             exchange_arrays = self.exchange_arrays
 
-        self._prepare_exchanges()
+        self._prepare_exchanges(self.sim_stream, exchange_arrays)
+        # self.exchange_stream.synchronize()
 
         if self.nccl_comm is not None:
             self.nccl_comm_exchange(exchange_arrays)
         elif self.nccl is not None:
             self.nccl_exchange(exchange_arrays)
+        elif self.mpi_persistent:
+            self.sim_stream.synchronize()
+            self.mpi_persistent_exchange(exchange_arrays)
         else:
-            self.gpu_stream.synchronize()
+            self.sim_stream.synchronize()
             self.mpi_exchange(exchange_arrays)
+
+        RangePop()
+        # self.exchange_stream.synchronize()
 
     def mpi_exchange(self, exchanges: dict[Array2D, ArrayExchange]):
         """
@@ -163,6 +183,57 @@ class MPIExchange:
 
         self.logger.debug(f"Rank {self.comm.rank} sent all data for transfer {self.step_number}")
         self.step_number += 1
+    def mpi_persistent_exchange(self, exchanges: dict[Array2D, MPIArrayExchange]):
+        """
+        Uses persistent connections with mpi4py to exchange data between arrays.
+        """
+        arrays: list[MPIArrayExchange] = []
+        directions: list[Direction] = []
+        comm_send: list[Prequest] = []
+        comm_recv: list[Prequest] = []
+
+        RangePush("run/exchange/send")
+        for array, array_exchange in exchanges.items():
+            RangePush(f"run/exchange/send/{array_exchange.index}")
+            if not isinstance(array_exchange, MPIArrayExchange):
+                raise RuntimeError(f"Wrong type of ArrayExchange received."
+                                   f" Expected `MPIArrayExchange`, got `{array_exchange.__class__.__name__}` instead.")
+            for direction in self.exists:
+                RangePush(f"run/exchange/send/{array_exchange.index}/{direction.name.lower()}")
+                arrays.append(array_exchange)
+                directions.append(direction)
+
+                exchange = array_exchange[direction]
+                if exchange is None:
+                    raise RuntimeError(
+                        f"Exchange was not prepared for the {direction.name} exchange, got `{exchange}` from `{array_exchange}`.")
+
+                comm_send.append(exchange.mpi_send)
+                comm_recv.append(exchange.mpi_recv)
+                RangePop()
+            RangePop()
+
+        RangePush("run/exchange/send/prequest/recv")
+        MPI.Prequest.Startall(comm_recv)
+        RangePop()
+        RangePush("run/exchange/send/prequest/send")
+        send_futures: list[Future] = []
+        for send in comm_send:
+            send_futures.append(self.mpi_executor.submit(MPI.Prequest.Startall, comm_send))
+        RangePop()
+
+        for i in range(len(directions)):
+            RangePush(f"run/exchange/send/exchange/wait/{i}")
+            index = MPI.Request.Waitany(comm_recv)
+            RangePop()
+
+            # arrays[index].upload_direction(directions[index], self.exchange_stream)
+            arrays[index].upload_direction(directions[index], self.sim_stream)
+
+        wait(send_futures)
+
+        MPI.Request.Waitall(comm_send)
+        RangePop()
 
     def nccl_exchange(self, exchanges: dict[Array2D, ArrayExchange]):
         """
@@ -247,6 +318,26 @@ class Exchange:
 
 
 @dataclass
+class ExchangeMPI(Exchange):
+    comm: Comm
+    rank: int
+    send_tag: int
+    recv_tag: int
+    mpi_send: Prequest = field(init=False)
+    mpi_recv: Prequest = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.mpi_send = self.comm.Send_init(self.send, self.rank, self.send_tag)
+        self.mpi_recv = self.comm.Recv_init(self.recv, self.rank, self.recv_tag)
+
+    def __del__(self):
+        self.mpi_send.Free()
+        self.mpi_recv.Free()
+
+
+@dataclass
 class ArrayExchange:
     index: int
     array: Array2D | Array3D
@@ -283,12 +374,12 @@ class ArrayExchange:
         if self.west is not None and self.west.copy:
             self.array.upload_boundary(gpu_stream, self.west.recv, "west")
 
-    def get_direction(self, direction: Direction) -> Exchange | None:
+    def __getitem__(self, item: Direction) -> Exchange | None:
         """
         Gets a direction's Exchange.
-        :param direction: Direction of which variable to get from.
+        :param item: Direction of which variable to get from.
         """
-        match direction:
+        match item:
             case Direction.NORTH:
                 return self.north
             case Direction.EAST:
@@ -298,7 +389,24 @@ class ArrayExchange:
             case Direction.WEST:
                 return self.west
             case _:
-                raise RuntimeError(f"{direction} is an invalid direction to get a variable from.")
+                raise RuntimeError(f"{item} is an invalid direction to get a variable from.")
+
+    def __setitem__(self, key: Direction, value: Exchange | None) -> None:
+        """
+        Set a direction's Exchange.
+        :param key: Direction of which variable to set to.
+        """
+        match key:
+            case Direction.NORTH:
+                self.north = value
+            case Direction.EAST:
+                self.east = value
+            case Direction.SOUTH:
+                self.south = value
+            case Direction.WEST:
+                self.west = value
+            case _:
+                raise RuntimeError(f"Attempted to access invalid key, `{key}`, in {self.__class__.__name__}.")
 
     def get_tags(self, step: int, total_arrays: int, direction: Direction) -> tuple[int, int]:
         """
@@ -318,3 +426,28 @@ class ArrayExchange:
         tag += self.index << direction_bits
 
         return tag + direction, tag + direction.opposite
+
+
+@dataclass
+class MPIArrayExchange(ArrayExchange):
+    north: ExchangeMPI | None = None
+    east: ExchangeMPI | None = None
+    south: ExchangeMPI | None = None
+    west: ExchangeMPI | None = None
+
+    def __getitem__(self, item) -> ExchangeMPI | None:
+        return super().__getitem__(item)
+
+    def __setitem__(self, key, value: ExchangeMPI | None) -> None:
+        super().__setitem__(key, value)
+
+    def upload_direction(self, direction: Direction, gpu_stream) -> None:
+        """
+        Uploads for a given direction.
+        :param direction: Direction of which array to upload.
+        :param gpu_stream: Stream for uploading data to device.
+        """
+        exchange = self.__getitem__(direction)
+
+        if exchange is not None and exchange.copy:
+            self.array.upload_boundary(gpu_stream, exchange.recv, direction.name.lower())
