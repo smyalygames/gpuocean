@@ -87,7 +87,7 @@ class MPIWrapper:
 
         if strong_scale:
             kwargs.update({'nx': self.grid.local_nx, 'ny': self.grid.local_ny})
-            self.logger.debug(f"New nx: {self.grid.local_nx}, new ny: {self.grid.local_ny}")
+            self.logger.debug("New nx: %d, new ny: %d", kwargs['nx'], kwargs['ny'])
             self._splice_x0 = self.grid.x0
             self._splice_x1 = self.grid.x1 + self.ghost_cells.total_x
             self._splice_y0 = self.grid.y0
@@ -109,6 +109,10 @@ class MPIWrapper:
             for key, value in kwargs.items():
                 if isinstance(value, np.ndarray):
                     kwargs[key] = self._decompose_array(value)
+        else:
+            kwargs.update({'nx': self.global_nx, 'ny': self.global_ny})
+            self.logger.debug("New nx: %d, new ny: %d", kwargs['nx'], kwargs['ny'])
+
 
         update_dt = False
         if kwargs['dt'] <= 0:
@@ -177,9 +181,14 @@ class MPIWrapper:
         """
         Re-initializes the simulator to a given state.
         """
-        eta_splice = self._decompose_array(eta)
-        hu_splice = self._decompose_array(hu)
-        hv_splice = self._decompose_array(hv)
+        if self.grid.strong_scale:
+            eta_splice = self._decompose_array(eta)
+            hu_splice = self._decompose_array(hu)
+            hv_splice = self._decompose_array(hv)
+        else:
+            eta_splice = eta
+            hu_splice = hu
+            hv_splice = hv
 
         # Upload data to simulator
         self.sim.upload(eta_splice, hu_splice, hv_splice)

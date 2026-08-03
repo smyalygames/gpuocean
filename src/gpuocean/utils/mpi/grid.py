@@ -56,6 +56,7 @@ class Grid:
         Grid.global_ny = ny
         self.total_nodes = total_nodes
         self.rank = rank
+        self.strong_scale = strong_scale
 
         # Subdomain grid size
         if strong_scale:
