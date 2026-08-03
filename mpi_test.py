@@ -388,7 +388,7 @@ if warmup:
     if profiling:
         t_warmup_start = time.time()
 
-    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, disable_progress_bar=disable_tqdm)
+    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
         sim.sim.sim_writer.sync()
