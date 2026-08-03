@@ -419,7 +419,7 @@ for i in trange(run_times, disable=disable_tqdm):
         t_sim_run_start = time.time()
 
     # Run simulator
-    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, disable_progress_bar=disable_tqdm)
+    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
         sim.sim.sim_writer.sync()
