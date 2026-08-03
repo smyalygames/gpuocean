@@ -6,6 +6,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 import time
 from typing import Any
 import socket
+from tqdm import trange
 
 from mpi4py import MPI
 import numpy as np
@@ -97,6 +98,7 @@ output.add_argument('-o', '--output', type=str, default="mpi_test.nc", help='Out
 output.add_argument('--include_ghostcells', action='store_false', help='Include ghost cells in the netCDF file')
 output.add_argument('--profile', action='store_true')
 output.add_argument('--log_debug', action='store_true', help='Writes debug logs to a log file')
+output.add_argument('--progress-bar', action='store_true', help='Show progress bar.')
 
 # Mostly for benchmarking
 parser.add_argument('--warmup', action='store_true', help='Run a warmup simulation first before the main task')
@@ -126,6 +128,7 @@ log_debug: bool = args.log_debug
 split_step = False
 compile_opts = ['-O2', '-funroll-loops', '-ffast-math']
 strong_scale = not args.weak_scale
+disable_tqdm = not args.progress_bar
 
 # Type of simulation data to use
 norkyst_url: str | None = args.norkyst_url
@@ -385,7 +388,7 @@ if warmup:
     if profiling:
         t_warmup_start = time.time()
 
-    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step)
+    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, disable_progress_bar=disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
         sim.sim.sim_writer.sync()
@@ -409,14 +412,14 @@ if profiling:
     write_profiling()
 
 logger.info(f"Running simulations for {run_times} runs.")
-for i in range(run_times):
+for i in trange(run_times, disable=disable_tqdm):
     run = i + 1
     logger.info(f"Starting run {run}.")
     if profiling:
         t_sim_run_start = time.time()
 
     # Run simulator
-    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step)
+    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, disable_progress_bar=disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
         sim.sim.sim_writer.sync()
