@@ -7,6 +7,7 @@ import numpy.typing as npt
 import cupy as cp
 from cupy.cuda import nccl
 from mpi4py import MPI
+from tqdm import tqdm
 
 from gpuocean.utils.gpu import Array2D, GPUHandler, GPUStream
 from gpuocean.utils.Common import BoundaryConditions, BoundaryType
@@ -206,18 +207,21 @@ class MPIWrapper:
         """
         return self.sim.arrays
 
-    def step(self, t_end=0.0, update_dt=False, split_step=True):
+    def step(self, t_end=0.0, update_dt=False, split_step=True, enable_progress_bar=False):
         t_now = 0.0
 
         if t_end == 0:
             self.sim.step(t_end, split_step=split_step)
 
-        while t_now < t_end:
-            t_now += self.sim.dt
-            self.sim.step(self.sim.dt, split_step=split_step)
+        with tqdm(desc=f"Running a {t_end:.3f} second simulation", total=t_end, unit="ss", bar_format="{n:.3f}", disable=enable_progress_bar) as pbar:
+            while t_now < t_end:
+                t_now += self.sim.dt
+                self.sim.step(self.sim.dt, split_step=split_step)
 
-            if update_dt:
-                self.update_dt()
+                pbar.update(self.sim.dt)
+
+                if update_dt:
+                    self.update_dt()
 
     def update_dt(self, courant_number: float = None):
         """
