@@ -222,7 +222,7 @@ class MPIWrapper:
         if t_end == 0:
             self.sim.step(t_end, split_step=split_step)
 
-        with tqdm(desc=f"Running a {t_end:.3f} second simulation", total=t_end, unit="ss", bar_format="{n:.3f}", disable=enable_progress_bar) as pbar:
+        with tqdm(desc=f"Running a {t_end:.3f} second simulation", total=t_end, unit="ss", bar_format="{n:.3f}", disable=not enable_progress_bar) as pbar:
             while t_now < t_end:
                 t_now += self.sim.dt
                 self.sim.step(self.sim.dt, split_step=split_step)
