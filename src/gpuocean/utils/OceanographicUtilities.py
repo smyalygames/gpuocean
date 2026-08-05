@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 import numpy.typing as npt
-from scipy import interpolate 
+from scipy.interpolate import RegularGridInterpolator
 
 
 def fillMaskedValues(input, steps=5):
@@ -253,29 +253,30 @@ def minmodX(eta, theta=1.3):
     return np.transpose(D)
 
     
-def rescaleMidpoints(data, nx1, ny1, **kwargs):
+def rescaleMidpoints(data: npt.NDArray | np.ma.MaskedArray, nx1: int, ny1: int, **kwargs):
     ny0, nx0 = data.shape
 
     nx1 = np.int32(nx1)
     ny1 = np.int32(ny1)
     
-    if (nx0 > nx1 and ny0 > ny1):
+    if nx0 > nx1 and ny0 > ny1:
         # Subsample - non volume preserving        
         x0 = np.linspace(0.5, nx0-0.5, nx0)
         y0 = np.linspace(0.5, ny0-0.5, ny0)
         
-        data_int = interpolate.interp2d(x0, y0, data, kind='linear', **kwargs)
+        data_int = RegularGridInterpolator((y0, x0), data, method='linear', **kwargs)
         
         dx1 = nx0 / nx1
         dy1 = ny0 / ny1
         
         x1 = np.linspace(0.5*dx1, nx0-0.5*dx1, nx1)
         y1 = np.linspace(0.5*dy1, ny0-0.5*dy1, ny1)
+
+        mx1, my1 = np.meshgrid(x1, y1)
         
-        out_data = data_int(x1, y1)
+        out_data = data_int((my1, mx1))
         if np.ma.is_masked(data):
-            x1, y1 = np.meshgrid(x1, y1)
-            out_mask = data.mask[y1.round().astype(np.int32), x1.round().astype(np.int32)]
+            out_mask = data.mask[my1.round().astype(np.int32), mx1.round().astype(np.int32)]
             out_data = np.ma.array(out_data, mask=out_mask)
             
         return nx0/nx1, ny0/ny1, out_data
@@ -306,26 +307,26 @@ def rescaleMidpoints(data, nx1, ny1, **kwargs):
         
         return nx0/nx1, ny0/ny1, out_data
 
-def rescaleIntersections(data, nx1, ny1, **kwargs):
+def rescaleIntersections(data: npt.NDArray | np.ma.MaskedArray, nx1: int, ny1: int, **kwargs):
     ny0, nx0 = data.shape
 
     nx1 = int(nx1)
     ny1 = int(ny1)
 
-    if (nx0 > nx1 and ny0 > ny1):
+    if nx0 > nx1 and ny0 > ny1:
         # Subsample - using linear interpolation
         x0 = np.linspace(0, nx0-1, nx0)
         y0 = np.linspace(0, ny0-1, ny0)
         
-        data_int = interpolate.interp2d(x0, y0, data, kind='linear', **kwargs)
+        data_int = RegularGridInterpolator((y0, x0), data, method='linear', **kwargs)
         
         x1 = np.linspace(0, nx0-1, nx1)
         y1 = np.linspace(0, ny0-1, ny1)
-        
-        out_data = data_int(x1, y1)
+
+        mx1, my1 = np.meshgrid(x1, y1)
+        out_data = data_int((my1, mx1))
         if np.ma.is_masked(data):
-            x1, y1 = np.meshgrid(x1, y1)
-            out_mask = data.mask[y1.round().astype(np.int32), x1.round().astype(np.int32)]
+            out_mask = data.mask[my1.round().astype(np.int32), mx1.round().astype(np.int32)]
             out_data = np.ma.array(out_data, mask=out_mask)
         
         return (nx0-1)/(nx1-1), (ny0-1)/(ny1-1), out_data
@@ -388,7 +389,7 @@ def calcGeostrophicBalance(eta, H_m, hu, hv, angle, f_beta, dx, dy, g=9.81, use_
     if hu is None and hv is None:
         #Get northward and eastward momentums
         hu_east = -g/f_beta * h * DetaDnorth
-        hv_north = g/f * h * DetaDeast
+        hv_north = g/f_beta * h * DetaDeast
 
         # Analytic inversion of 2x2 linear system
         det = east[0]*north[1] - east[1]*north[0]
