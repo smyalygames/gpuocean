@@ -92,7 +92,7 @@ parser.add_argument('-dt', type=float, default=0.1, help='Time step size')
 parser.add_argument('-t', type=float, default=1000, help='Total simulation time to run for')
 parser.add_argument('--weak-scale', action='store_true', help='Do not do domain decomposition.')
 parser.add_argument('--dynamic_dt', action='store_true', help='Dynamically calculate time step')
-parser.add_argument('--rescale', action='store_true', help="Rescales the domain to match set nx")
+parser.add_argument('--rescale', default=1, type=float, help="Rescales the domain.")
 output.add_argument('--netcdf', action='store_true', help='Output netCDF file')
 output.add_argument('-o', '--output', type=str, default="mpi_test.nc", help='Output location for netCDF file')
 output.add_argument('--include_ghostcells', action='store_false', help='Include ghost cells in the netCDF file')
@@ -118,7 +118,9 @@ args = parser.parse_args()
 # Simulator conditions
 dt: float = args.dt
 dynamic_dt: bool = args.dynamic_dt
-rescale: bool = args.rescale
+rescale: int = args.rescale
+if rescale <= 0:
+    raise RuntimeError(f"Rescaling has to be greater than 0. Got: {rescale}.")
 write_netcdf: bool = args.netcdf
 netcdf_filename: str = args.output
 ignore_ghostcells = args.include_ghostcells
@@ -271,22 +273,22 @@ if norkyst_url is not None:
             'url': norkyst_url,
             'case_name': case_name,
             't_hours': T_hours,
+            'rescale': rescale,
         }
         profiling_data['norkyst_info'] = norkyst_info
         write_profiling()
 
     if rank == 0:
         kwargs: dict[str, Any] = getInitialConditionsNorKystCases(norkyst_url, case_name,
-                                                                  download_data=True, erode_land=1,
+                                                                  download_data=True,
                                                                   timestep_indices=timestep_indices)
     else:
         kwargs = None
 
     kwargs: dict[str, Any] = comm.bcast(kwargs, root=0)
 
-    if rescale:
-        scale = nx / kwargs['nx']
-        kwargs = rescaleInitialConditions(kwargs, scale)
+    if rescale != 1 and rescale > 0:
+        kwargs = rescaleInitialConditions(kwargs, rescale)
 
     kwargs = removeMetadata(kwargs)
 
