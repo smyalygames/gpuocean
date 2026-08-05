@@ -330,7 +330,7 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
     return ic
 
 
-def rescaleInitialConditions(old_ic, scale):
+def rescaleInitialConditions(old_ic, scale: float):
     ic = copy.deepcopy(old_ic)
 
     ic['NX'] = int(old_ic['NX'] * scale)
@@ -351,8 +351,7 @@ def rescaleInitialConditions(old_ic, scale):
         _, _, ic['latitude'] = OceanographicUtilities.rescaleMidpoints(old_ic['latitude'], ic['NX'], ic['NY'])
 
     # Scale number of sponge cells also
-    for key in ic['boundary_conditions'].spongeCells.keys():
-        ic['boundary_conditions'].spongeCells[key] = int(ic['boundary_conditions'].spongeCells[key] * scale)
+    ic['boundary_conditions'].spongeCells.rescale(scale)
 
     # Not touched:
     # "boundary_conditions":

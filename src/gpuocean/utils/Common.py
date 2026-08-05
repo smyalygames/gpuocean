@@ -35,7 +35,7 @@ import gc
 import warnings
 import functools
 from enum import IntEnum
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 
 import numpy as np
 
@@ -273,6 +273,14 @@ class SpongeCells:
     east: int
     south: int
     west: int
+
+    def rescale(self, factor: float):
+        """
+        Rescales every sponge cell by a given factor.
+        :param factor: Amount to scale by.
+        """
+        scaled_data = {k: v * factor for k, v in asdict(self).items()}
+        return replace(self, **scaled_data)
 
     def __str__(self):
         return f"SpongeCells: {{north: {self.north}, east: {self.east}, south: {self.south}, west: {self.west}}}"
