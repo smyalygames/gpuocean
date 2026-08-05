@@ -439,7 +439,7 @@ for i in trange(run_times, disable=disable_tqdm):
             t_step -= t
 
     # Run simulator
-    t = sim.step(t_end=t_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
+    t = sim.step(t_end=t_step, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_interval,
                  enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
