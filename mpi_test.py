@@ -96,6 +96,7 @@ parser.add_argument('--rescale', action='store_true', help="Rescales the domain 
 output.add_argument('--netcdf', action='store_true', help='Output netCDF file')
 output.add_argument('-o', '--output', type=str, default="mpi_test.nc", help='Output location for netCDF file')
 output.add_argument('--include_ghostcells', action='store_false', help='Include ghost cells in the netCDF file')
+output.add_argument('--nc-only-last', action='store_true', help="Only stores the first and last parts of the simulation in the netCDF file.")
 output.add_argument('--profile', action='store_true')
 output.add_argument('--log_debug', action='store_true', help='Writes debug logs to a log file')
 output.add_argument('--progress-bar', action='store_true', help='Show progress bar.')
@@ -121,6 +122,7 @@ rescale: bool = args.rescale
 write_netcdf: bool = args.netcdf
 netcdf_filename: str = args.output
 ignore_ghostcells = args.include_ghostcells
+nc_only_last: bool = args.nc_only_last
 use_mpi: bool = args.mpi or args.mpi_np
 use_mpi_persistent = not args.mpi_np
 use_nccl: bool = args.nccl
@@ -193,6 +195,7 @@ if profiling:
     profiling_data['gpu_device'] = device
     profiling_data['n_processes'] = MPI.COMM_WORLD.size
     profiling_data['gpu_compile_args'] = compile_opts
+    profiling_data['netcdf_only_last'] = nc_only_last
     profiling_data['log_debug'] = log_debug
     init_data_type = 'bump'
     if norkyst_url is not None:
@@ -388,9 +391,12 @@ if warmup:
     if profiling:
         t_warmup_start = time.time()
 
-    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, enable_progress_bar=not disable_tqdm)
+    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_only_last,
+             enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
+        if nc_only_last:
+            sim.sim.writeState()
         sim.sim.sim_writer.sync()
 
     if profiling:
@@ -419,9 +425,12 @@ for i in trange(run_times, disable=disable_tqdm):
         t_sim_run_start = time.time()
 
     # Run simulator
-    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, enable_progress_bar=not disable_tqdm)
+    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_only_last,
+                 enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
+        if nc_only_last:
+            sim.sim.writeState()
         sim.sim.sim_writer.sync()
 
     if profiling:
