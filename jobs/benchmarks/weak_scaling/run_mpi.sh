@@ -17,11 +17,11 @@ export OPTIONAL_PARAMS=$opt_params
 
 benchmark_id=$(date +%s)
 export BENCHMARK_ID=$benchmark_id
-echo "Submitting nccl weak scaling test, with benchmark ID: ${benchmark_id}"
+echo "Submitting MPI weak scaling test, with benchmark ID: ${benchmark_id}"
 
-job=/project/project_465002898/anthony/gpuocean/jobs/benchmarks/weak_scaling/nccl.slurm
+job=/project/project_465002898/anthony/gpuocean/jobs/benchmarks/weak_scaling/mpi.slurm
 
-# Only for handling <1 node
+# Only for handling < 1 node
 for processes in {0..2}; do
   total_tasks=$((2**processes))
 
@@ -40,11 +40,10 @@ for processes in {0..2}; do
     --ntasks-per-node=$gpus_per_node \
     --gpus-per-node=$gpus_per_node \
     --time=00:40:00 \
-    --output="out/GPUOcean-nccl-weak-%j-${total_tasks}.out" \
+    --output="out/GPUOcean-mpi-weak-%j-${total_tasks}.out" \
     $job "$benchmark_id"
 done
 
-# Only up to 32 GPUs for now
 gpus=(1 2 4)
 
 for nodes in "${gpus[@]}"; do
@@ -67,7 +66,7 @@ for nodes in "${gpus[@]}"; do
     --gpus-per-node=$gpus_per_node \
     --exclusive \
     --time=00:50:00 \
-    --output="out/GPUOcean-nccl-weak-%j-${total_tasks}.out" \
+    --output="out/GPUOcean-mpi-weak-%j-${total_tasks}.out" \
     $job "$benchmark_id"
 done
 
