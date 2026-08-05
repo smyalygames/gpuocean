@@ -27,13 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Import packages we need
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 import gc
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RegularGridInterpolator
 
 from gpuocean.utils import WindStress, AtmosphericPressure, OceanographicUtilities
 from gpuocean.utils.netcdf import SimNetCDFWriter, SimNetCDFReader
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
     from mpi4py import MPI
 
     from gpuocean.utils.gpu import KernelContext
+    from gpuocean.utils.dataclass import GhostCells
 
 
 class CDKLM16(Simulator.Simulator):
@@ -64,7 +66,7 @@ class CDKLM16(Simulator.Simulator):
                  subsample_f=10,
                  angle=np.array([[0]], dtype=np.float32),
                  subsample_angle=10,
-                 latitude: float = None,
+                 latitude: float | npt.NDArray = None,
                  rho_o=1025.0,
                  t=0.0,
                  theta=1.8, rk_order=2,
@@ -194,15 +196,19 @@ class CDKLM16(Simulator.Simulator):
         def subsample_texture(data: npt.NDArray, factor: int):
             ny, nx = data.shape
             dx, dy = 1 / nx, 1 / ny
-            I = RectBivariateSpline(np.linspace(0.5 * dx, 1 - 0.5 * dx, nx),
-                                    np.linspace(0.5 * dy, 1 - 0.5 * dy, ny),
-                                    data.T, kx=1, ky=1)
+
+            x_old = np.linspace(0.5 * dx, 1 - 0.5 * dx, nx)
+            y_old = np.linspace(0.5 * dy, 1 - 0.5 * dy, ny)
+            I = RegularGridInterpolator((y_old, x_old), data, method='linear')
 
             new_nx, new_ny = max(2, nx // factor), max(2, ny // factor)
             new_dx, new_dy = 1 / new_nx, 1 / new_ny
+
             x_new = np.linspace(0.5 * new_dx, 1 - 0.5 * new_dx, new_nx)
             y_new = np.linspace(0.5 * new_dy, 1 - 0.5 * new_dy, new_ny)
-            return np.ascontiguousarray(I(x_new, y_new).T)
+
+            mx_new, my_new = np.meshgrid(x_new, y_new)
+            return I((my_new, mx_new))
 
         # Create the CPU coriolis
         if latitude is not None:
@@ -225,16 +231,18 @@ class CDKLM16(Simulator.Simulator):
                 n = x * np.sin(angle[0, 0]) + y * np.cos(angle[0, 0])  # North vector
                 coriolis_f = self.f + self.coriolis_beta * n
             else:
-                if isinstance(self.f, float):
+                if self.f.size == 1:
                     coriolis_f = np.array([[self.f]], dtype=np.float32, order='C')
                 elif self.f.shape == eta0.shape:
                     coriolis_f = np.array(self.f, dtype=np.float32, order='C')
                 else:
                     raise RuntimeError("The shape of f should match up with eta or be scalar.")
 
-        if subsample_f and coriolis_f.size >= eta0.size:
+        if subsample_f and coriolis_f.size > eta0.size:
             self.logger.info("Subsampling coriolis texture by factor " + str(subsample_f))
-            self.logger.warning("This will give inaccurate coriolis along the border!")
+            self.logger.warning("This will give inaccurate coriolis along the border"
+                                " as coriolis array is of size %d and eta0 is of size %d!",
+                                coriolis_f.size, eta0.size)
             coriolis_f = subsample_texture(coriolis_f, subsample_f)
 
         # Initialize coriolis force GPU array
@@ -243,7 +251,7 @@ class CDKLM16(Simulator.Simulator):
                                       coriolis_f, padded=False)
 
         # Subsample angle
-        if subsample_angle and angle.size >= eta0.size:
+        if subsample_angle and angle.size > eta0.size:
             self.logger.info("Subsampling angle texture by factor " + str(subsample_angle))
             self.logger.warning("This will give inaccurate angle along the border!")
             angle = subsample_texture(angle, subsample_angle)
@@ -253,34 +261,25 @@ class CDKLM16(Simulator.Simulator):
                                  angle.shape[1], angle.shape[0], 0, 0,
                                  angle)
 
-        defines = {'block_width': block_width, 'block_height': block_height,
-                   'KPSIMULATOR_DESING_EPS': "{:.12f}f".format(desingularization_eps),
-                   'KPSIMULATOR_FLUX_SLOPE_EPS': "{:.12f}f".format(flux_slope_eps),
-                   'KPSIMULATOR_DEPTH_CUTOFF': "{:.12f}f".format(depth_cutoff),
-                   'THETA': "{:.12f}f".format(self.theta),
-                   'RK_ORDER': self.rk_order,
-                   'NX': self.nx,
-                   'NY': self.ny,
-                   'DX': "{:.12f}f".format(self.dx),
-                   'DY': "{:.12f}f".format(self.dy),
-                   'GRAV': "{:.12f}f".format(self.g),
-                   'FRIC': "{:.12f}f".format(self.r),
-                   'RHO_O': "{:.12f}f".format(rho_o),
-                   'WIND_STRESS_FACTOR': "{:.12f}f".format(wind_stress_factor),
-                   'ONE_DIMENSIONAL': 0,
-                   'FLUX_BALANCER': "{:.12f}f".format(flux_balancer),
-                   'CORIOLIS_F_NX': coriolis_f.shape[1],
-                   'CORIOLIS_F_NY': coriolis_f.shape[0],
-                   'ANGLE_NX': angle.shape[1],
-                   'ANGLE_NY': angle.shape[0],
-                   'ATMOS_PRES_NX': self.atmospheric_pressure.P[0].shape[1],
-                   'ATMOS_PRES_NY': self.atmospheric_pressure.P[0].shape[0],
-                   'WIND_STRESS_X_NX': self.wind_stress.stress_u[0].shape[1],
-                   'WIND_STRESS_X_NY': self.wind_stress.stress_u[0].shape[0],
-                   'WIND_STRESS_Y_NX': self.wind_stress.stress_v[0].shape[1],
-                   'WIND_STRESS_Y_NY': self.wind_stress.stress_v[0].shape[0],
-                   'USE_DIRECT_LOOKUP': use_direct_lookup
-                   }
+        defines = CDKLMDefines(block_width, block_height,
+                               desingularization_eps, flux_slope_eps, depth_cutoff,
+                               self.theta,
+                               self.rk_order,
+                               self.nx, self.ny,
+                               self.dx, self.dy,
+                               self.g,
+                               self.r,
+                               rho_o,
+                               wind_stress_factor,
+                               one_dimensional,
+                               flux_balancer,
+                               coriolis_f,
+                               angle,
+                               self.atmospheric_pressure,
+                               self.wind_stress,
+                               use_direct_lookup,
+                               self.ghost_cells
+                               )
 
         if compile_opts is None:
             compile_opts = []
@@ -312,8 +311,26 @@ class CDKLM16(Simulator.Simulator):
                                          jit_compile_args=jit_compile_args
                                          )
 
+        self.kernel_ns = gpu_ctx.get_kernel("CDKLM16_kernel",
+                                            defines=defines.north_south,
+                                            compile_args=compile_args,
+                                            jit_compile_args=jit_compile_args)
+
+        self.kernel_ew = gpu_ctx.get_kernel("CDKLM16_kernel",
+                                            defines=defines.east_west,
+                                            compile_args=compile_args,
+                                            jit_compile_args=jit_compile_args)
+
+        self.kernel_inner = gpu_ctx.get_kernel("CDKLM16_kernel",
+                                               defines=defines.inner,
+                                               compile_args=compile_args,
+                                               jit_compile_args=jit_compile_args)
+
         # Get CUDA functions and define data types for prepared_{async_}call()
         self.cdklm_swe_2D = GPUHandler(self.kernel, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        self.cdklm_swe_2D_nw = GPUHandler(self.kernel_ns, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        self.cdklm_swe_2D_ew = GPUHandler(self.kernel_ew, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        self.cdklm_swe_2D_inner = GPUHandler(self.kernel_inner, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
         self.update_wind_stress(self.kernel)
         self.update_atmospheric_pressure(self.kernel)
 
@@ -498,7 +515,7 @@ class CDKLM16(Simulator.Simulator):
 
         return cls(**sim_params)
 
-    def step(self, t_end=0.0, apply_stochastic_term=True, write_now=True, update_dt=False):
+    def step(self, t_end=0.0, apply_stochastic_term=True, write_now=True, update_dt=False, split_step=False):
         """
         Function which steps n timesteps.
         apply_stochastic_term: Boolean value for whether the stochastic
@@ -528,21 +545,21 @@ class CDKLM16(Simulator.Simulator):
 
                 self.callKernel(self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
                                 self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 0)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 0, split_step)
 
                 self.bc_kernel.boundaryCondition(self.gpu_stream,
                                                  self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1)
 
                 self.callKernel(self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
                                 self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 1)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 1, split_step)
 
                 # Applying final boundary conditions after perturbation (if applicable)
 
             elif self.rk_order == 1:
                 self.callKernel(self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
                                 self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 0)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 0, split_step)
 
                 self.gpu_data.swap()
 
@@ -553,21 +570,21 @@ class CDKLM16(Simulator.Simulator):
 
                 self.callKernel(self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
                                 self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 0)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 0, split_step)
 
                 self.bc_kernel.boundaryCondition(self.gpu_stream,
                                                  self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1)
 
                 self.callKernel(self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
                                 self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 1)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 1, split_step)
 
                 self.bc_kernel.boundaryCondition(self.gpu_stream,
                                                  self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1)
 
                 self.callKernel(self.gpu_data.h1, self.gpu_data.hu1, self.gpu_data.hv1,
                                 self.gpu_data.h0, self.gpu_data.hu0, self.gpu_data.hv0,
-                                local_dt, wind_stress_t, atmospheric_pressure_t, 2)
+                                local_dt, wind_stress_t, atmospheric_pressure_t, 2, split_step)
 
                 # Applying final boundary conditions after perturbation (if applicable)
 
@@ -582,8 +599,8 @@ class CDKLM16(Simulator.Simulator):
             # Evolve drifters
             self.drifterStep(local_dt)
 
-            self.t += np.float64(local_dt)
-            t_now += np.float64(local_dt)
+            self.t += local_dt
+            t_now += local_dt
             self.num_iterations += 1
 
         if self.write_netcdf and write_now:
@@ -712,6 +729,11 @@ class CDKLM16(Simulator.Simulator):
                             self.bathymetry.Bi.pointer, self.bathymetry.Bm.pointer, # TODO added this later 10/07
                             self.wind_stress_x_current_arr.pointer, self.wind_stress_y_current_arr.pointer)
 
+        if split_steps:
+            self.split_step(h_in, hu_in, hv_in, h_out, hu_out, hv_out, local_dt, wind_stress_t, atmospheric_pressure_t,
+                            rk_step, exchange_exclude)
+            return
+
         # "Beautify" code a bit by packing four int8s into a single int32
         # Note: Must match code in kernel!
         boundary_conditions = 0
@@ -743,6 +765,245 @@ class CDKLM16(Simulator.Simulator):
                                       self.wind_stress_y_next_arr.pointer,
                                       wind_stress_t,
                                       boundary_conditions], exchange_exclude=exchange_exclude)
+
+    def split_step(self,
+                   h_in: Array2D, hu_in: Array2D, hv_in: Array2D,
+                   h_out: Array2D, hu_out: Array2D, hv_out: Array2D,
+                   local_dt: float, wind_stress_t: float, atmospheric_pressure_t: float, rk_step: int,
+                   exchange_exclude: Iterable):
+        """
+        Calculates the border first, exchanges the data, then calculates the inner data.
+        """
+        self.call_outer_kernel(h_in, hu_in, hv_in,
+                               h_out, hu_out, hv_out,
+                               local_dt, wind_stress_t, atmospheric_pressure_t, rk_step)
+        self.logger.info("Finished outer, synchronizing...")
+
+        self.gpu_stream.synchronize()
+        self.logger.info("Finished synchronizing")
+        self.call_inner_kernel(h_in, hu_in, hv_in,
+                               h_out, hu_out, hv_out,
+                               local_dt, wind_stress_t, atmospheric_pressure_t, rk_step, exchange_exclude)
+        self.logger.info("Finished split computation")
+
+    def call_inner_kernel(self,
+                          h_in: Array2D, hu_in: Array2D, hv_in: Array2D,
+                          h_out: Array2D, hu_out: Array2D, hv_out: Array2D,
+                          local_dt: float, wind_stress_t: float, atmospheric_pressure_t: float, rk_step: int,
+                          exchange_exclude: Iterable):
+        """
+        Used for splitting up computing the entire domain. This function is used for calculating the inner domain.
+        Only computes interior cells that haven't been computed by call_outer_kernel.
+        """
+        # As it's the inner domain, boundary conditions should be ignored
+        boundary_conditions = 0
+
+        # Inner domain offsets: skip ghost cells on all sides
+        # Row offset: skip north ghost cells
+        offset = (self.ghost_cells.y, self.ghost_cells.x)
+
+        self.logger.info("Starting Inner")
+        self.cdklm_swe_2D_inner.async_call(self.global_size, self.local_size, self.gpu_stream,
+                                           [local_dt,
+                                            rk_step,
+                                            h_in.offset_pointer(offset), h_in.pitch,
+                                            hu_in.offset_pointer(offset), hu_in.pitch,
+                                            hv_in.offset_pointer(offset), hv_in.pitch,
+                                            h_out.offset_pointer(offset),
+                                            h_out.pitch,
+                                            hu_out.offset_pointer(offset),
+                                            hu_out.pitch,
+                                            hv_out.offset_pointer(offset),
+                                            hv_out.pitch,
+                                            self.bathymetry.Bi.offset_pointer(offset),
+                                            self.bathymetry.Bi.pitch,
+                                            self.bathymetry.Bm.offset_pointer(offset),
+                                            self.bathymetry.Bm.pitch,
+                                            self.bathymetry.mask_value,
+                                            self.coriolis_f_arr.offset_pointer(offset),
+                                            self.angle_arr.offset_pointer(offset),
+                                            self.atmospheric_pressure_current_arr.pointer,
+                                            self.atmospheric_pressure_next_arr.pointer,
+                                            atmospheric_pressure_t,
+                                            self.wind_stress_x_current_arr.pointer,
+                                            self.wind_stress_x_next_arr.pointer,
+                                            self.wind_stress_y_current_arr.pointer,
+                                            self.wind_stress_y_next_arr.pointer,
+                                            wind_stress_t,
+                                            boundary_conditions],
+                                           exchange=True,
+                                           exchange_exclude=exchange_exclude)
+
+    def call_outer_kernel(self,
+                          h_in: Array2D, hu_in: Array2D, hv_in: Array2D,
+                          h_out: Array2D, hu_out: Array2D, hv_out: Array2D,
+                          local_dt: float, wind_stress_t: float, atmospheric_pressure_t: float, rk_step: int):
+
+        boundary_ns = 0
+        boundary_ew = 0
+        boundary_ns = boundary_ns | (int(self.boundary_conditions.east) << 8)
+        boundary_ns = boundary_ns | (int(self.boundary_conditions.west) << 0)
+        boundary_north = boundary_ns | (int(self.boundary_conditions.north) << 24)
+        boundary_south = boundary_ns | (int(self.boundary_conditions.south) << 16)
+        boundary_ew = boundary_ew | (int(self.boundary_conditions.north) << 24)
+        boundary_ew = boundary_ew | (int(self.boundary_conditions.south) << 16)
+        boundary_east = boundary_ew | (int(self.boundary_conditions.east) << 8)
+        boundary_west = boundary_ew | (int(self.boundary_conditions.west) << 0)
+
+        # North boundary: rows [halo_y + ny, ny_halo)
+        north_offset = (self.ny - self.ghost_cells.south, 0)
+        north_offset_bathymetry = (self.ny - (1 + self.ghost_cells.south), 0)
+        if self.coriolis_f_arr.shape[0] < self.ghost_cells.y:
+            north_offset_coriolis = (0, 0)
+        else:
+            north_offset_coriolis = (self.ghost_cells.south, 0)
+        if self.angle_arr.shape[0] < self.ghost_cells.y:
+            north_offset_angle = (0, 0)
+        else:
+            north_offset_angle = (self.ghost_cells.south, 0)
+        self.logger.info("Starting North")
+
+        self.cdklm_swe_2D_nw.async_call((self.global_size[0], 1), self.local_size, self.gpu_stream,
+                                        [local_dt,
+                                         rk_step,
+                                         h_in.offset_pointer(north_offset), h_in.pitch,
+                                         hu_in.offset_pointer(north_offset), hu_in.pitch,
+                                         hv_in.offset_pointer(north_offset), hv_in.pitch,
+                                         h_out.offset_pointer(north_offset), h_out.pitch,
+                                         hu_out.offset_pointer(north_offset), hu_out.pitch,
+                                         hv_out.offset_pointer(north_offset), hv_out.pitch,
+                                         self.bathymetry.Bi.offset_pointer(north_offset_bathymetry),
+                                         self.bathymetry.Bi.pitch,
+                                         self.bathymetry.Bm.offset_pointer(north_offset_bathymetry),
+                                         self.bathymetry.Bm.pitch,
+                                         self.bathymetry.mask_value,
+                                         self.coriolis_f_arr.offset_pointer(north_offset_coriolis),
+                                         self.angle_arr.offset_pointer(north_offset_angle),
+                                         self.atmospheric_pressure_current_arr.pointer,
+                                         self.atmospheric_pressure_next_arr.pointer,
+                                         atmospheric_pressure_t,
+                                         self.wind_stress_x_current_arr.pointer,
+                                         self.wind_stress_x_next_arr.pointer,
+                                         self.wind_stress_y_current_arr.pointer,
+                                         self.wind_stress_y_next_arr.pointer,
+                                         wind_stress_t,
+                                         boundary_north],
+                                        exchange=False)
+
+        self.logger.info("Starting South")
+
+        # South boundary: rows [0, halo_y)
+        self.cdklm_swe_2D_nw.async_call((self.global_size[0], 1), self.local_size, self.gpu_stream,
+                                        [local_dt,
+                                         rk_step,
+                                         h_in.pointer, h_in.pitch,
+                                         hu_in.pointer, hu_in.pitch,
+                                         hv_in.pointer, hv_in.pitch,
+                                         h_out.pointer, h_out.pitch,
+                                         hu_out.pointer, hu_out.pitch,
+                                         hv_out.pointer, hv_out.pitch,
+                                         self.bathymetry.Bi.pointer, self.bathymetry.Bi.pitch,
+                                         self.bathymetry.Bm.pointer, self.bathymetry.Bm.pitch,
+                                         self.bathymetry.mask_value,
+                                         self.coriolis_f_arr.pointer,
+                                         self.angle_arr.pointer,
+                                         self.atmospheric_pressure_current_arr.pointer,
+                                         self.atmospheric_pressure_next_arr.pointer,
+                                         atmospheric_pressure_t,
+                                         self.wind_stress_x_current_arr.pointer,
+                                         self.wind_stress_x_next_arr.pointer,
+                                         self.wind_stress_y_current_arr.pointer,
+                                         self.wind_stress_y_next_arr.pointer,
+                                         wind_stress_t,
+                                         boundary_south],
+                                        exchange=False)
+
+        # East boundary: cols [halo_x + nx, nx_halo)
+        # Skip north and south boundaries
+        east_offset = (self.ghost_cells.south, self.nx - self.ghost_cells.west)
+        east_bathymetry_offset = (self.ghost_cells.south + 1, self.nx - (1 + self.ghost_cells.west))
+        if self.coriolis_f_arr.shape[0] < self.ghost_cells.y:
+            east_coriolis_offset = (0, 0)
+        else:
+            east_coriolis_offset = (self.ghost_cells.south,
+                                    max(0, self.coriolis_f_arr.shape[1] - self.ghost_cells.west))
+        if self.angle_arr.shape[0] < self.ghost_cells.y:
+            east_angle_offset = (0, 0)
+        else:
+            east_angle_offset = (self.ghost_cells.south, max(0, self.angle_arr.shape[1] - self.ghost_cells.west))
+
+        self.logger.info("Starting East")
+
+        self.cdklm_swe_2D_ew.async_call((1, self.global_size[1]), self.local_size, self.gpu_stream,
+                                        [local_dt,
+                                         rk_step,
+                                         h_in.offset_pointer(east_offset), h_in.pitch,
+                                         hu_in.offset_pointer(east_offset), hu_in.pitch,
+                                         hv_in.offset_pointer(east_offset), hv_in.pitch,
+                                         h_out.offset_pointer(east_offset), h_out.pitch,
+                                         hu_out.offset_pointer(east_offset), hu_out.pitch,
+                                         hv_out.offset_pointer(east_offset), hv_out.pitch,
+                                         self.bathymetry.Bi.offset_pointer(east_bathymetry_offset),
+                                         self.bathymetry.Bi.pitch,
+                                         self.bathymetry.Bm.offset_pointer(east_bathymetry_offset),
+                                         self.bathymetry.Bm.pitch,
+                                         self.bathymetry.mask_value,
+                                         self.coriolis_f_arr.offset_pointer(east_coriolis_offset),
+                                         self.angle_arr.offset_pointer(east_angle_offset),
+                                         self.atmospheric_pressure_current_arr.pointer,
+                                         self.atmospheric_pressure_next_arr.pointer,
+                                         atmospheric_pressure_t,
+                                         self.wind_stress_x_current_arr.pointer,
+                                         self.wind_stress_x_next_arr.pointer,
+                                         self.wind_stress_y_current_arr.pointer,
+                                         self.wind_stress_y_next_arr.pointer,
+                                         wind_stress_t,
+                                         boundary_east],
+                                        exchange=False)
+
+        # West boundary: cols [0, halo_x)
+        # Skip north and south boundaries
+
+        self.logger.info("Starting West")
+
+        west_offset = (0, self.nx - self.ghost_cells.west)
+        west_bathymetry_offset = (0 + 1, self.nx - (1 + self.ghost_cells.west))
+        if self.coriolis_f_arr.shape[0] < self.ghost_cells.y:
+            west_coriolis_offset = (0, 0)
+        else:
+            west_coriolis_offset = (0,
+                                    max(0, self.coriolis_f_arr.shape[1] - self.ghost_cells.west))
+        if self.angle_arr.shape[0] < self.ghost_cells.y:
+            west_angle_offset = (0, 0)
+        else:
+            west_angle_offset = (0, max(0, self.angle_arr.shape[1] - self.ghost_cells.west))
+
+        self.cdklm_swe_2D_ew.async_call((1, self.global_size[1]), self.local_size, self.gpu_stream,
+                                        [local_dt,
+                                         rk_step,
+                                         h_in.offset_pointer(west_offset),
+                                         int(hu_in.offset_pointer(west_offset)), hu_in.pitch,
+                                         int(hv_in.offset_pointer(west_offset)), hv_in.pitch,
+                                         int(h_out.offset_pointer(west_offset)), h_out.pitch,
+                                         int(hu_out.offset_pointer(west_offset)), hu_out.pitch,
+                                         int(hv_out.offset_pointer(west_offset)), hv_out.pitch,
+                                         int(self.bathymetry.Bi.offset_pointer(west_bathymetry_offset)),
+                                         self.bathymetry.Bi.pitch,
+                                         int(self.bathymetry.Bm.offset_pointer(west_bathymetry_offset)),
+                                         self.bathymetry.Bm.pitch,
+                                         self.bathymetry.mask_value,
+                                         int(self.coriolis_f_arr.offset_pointer(west_coriolis_offset)),
+                                         int(self.angle_arr.offset_pointer(west_angle_offset)),
+                                         self.atmospheric_pressure_current_arr.pointer,
+                                         self.atmospheric_pressure_next_arr.pointer,
+                                         atmospheric_pressure_t,
+                                         self.wind_stress_x_current_arr.pointer,
+                                         self.wind_stress_x_next_arr.pointer,
+                                         self.wind_stress_y_current_arr.pointer,
+                                         self.wind_stress_y_next_arr.pointer,
+                                         wind_stress_t,
+                                         boundary_west],
+                                        exchange=False)
 
     def perturbState(self, perturbation_scale=1.0, update_random_field=True, q0_scale=1):
         if not q0_scale == 1:
@@ -921,3 +1182,97 @@ class CDKLM16(Simulator.Simulator):
         Ly_norm = np.linalg.norm(Ly_cpu)
 
         return uxpvy_norm, Kx_norm, Ly_norm
+
+
+@dataclass
+class CDKLMDefines:
+    block_width: int
+    block_height: int
+    desingularization_eps: float
+    flux_slope_eps: float
+    depth_cutoff: float
+    theta: float
+    rk_order: int
+    nx: int
+    ny: int
+    dx: float
+    dy: float
+    gravity: float
+    friction: float
+    rho_o: float
+    wind_stress_factor: float
+    one_dimensional: bool
+    flux_balancer: float
+    coriolis_f: npt.NDArray
+    angle: npt.NDArray
+    atmospheric_pressure: AtmosphericPressure.AtmosphericPressure
+    wind_stress: WindStress.WindStress
+    use_direct_lookup: bool
+    ghost_cells: GhostCells
+
+    def __compute_defines(self, nx: int, ny: int):
+        return {
+            'block_width': self.block_width, 'block_height': self.block_height,
+            'KPSIMULATOR_DESING_EPS': "{:.12f}f".format(self.desingularization_eps),
+            'KPSIMULATOR_FLUX_SLOPE_EPS': "{:.12f}f".format(self.flux_slope_eps),
+            'KPSIMULATOR_DEPTH_CUTOFF': "{:.12f}f".format(self.depth_cutoff),
+            'THETA': "{:.12f}f".format(self.theta),
+            'RK_ORDER': self.rk_order,
+            'NX': nx,
+            'NY': ny,
+            'DX': "{:.12f}f".format(self.dx),
+            'DY': "{:.12f}f".format(self.dy),
+            'GRAV': "{:.12f}f".format(self.gravity),
+            'FRIC': "{:.12f}f".format(self.friction),
+            'RHO_O': "{:.12f}f".format(self.rho_o),
+            'WIND_STRESS_FACTOR': "{:.12f}f".format(self.wind_stress_factor),
+            'ONE_DIMENSIONAL': int(self.one_dimensional),
+            'FLUX_BALANCER': "{:.12f}f".format(self.flux_balancer),
+            # These minimums here are a bit hacky
+            # TODO understand the sizes of the arrays below, because my assumption is that they can be smaller than nx and ny
+            'CORIOLIS_F_NX': self.coriolis_f.shape[1],
+            'CORIOLIS_F_NY': self.coriolis_f.shape[0],
+            'ANGLE_NX': self.angle.shape[1],
+            'ANGLE_NY': self.angle.shape[0],
+            'ATMOS_PRES_NX': self.atmospheric_pressure.P[0].shape[1],
+            'ATMOS_PRES_NY': self.atmospheric_pressure.P[0].shape[0],
+            'WIND_STRESS_X_NX': self.wind_stress.stress_u[0].shape[1],
+            'WIND_STRESS_X_NY': self.wind_stress.stress_u[0].shape[0],
+            'WIND_STRESS_Y_NX': self.wind_stress.stress_v[0].shape[1],
+            'WIND_STRESS_Y_NY': self.wind_stress.stress_v[0].shape[0],
+            'USE_DIRECT_LOOKUP': self.use_direct_lookup
+        }
+
+    @property
+    def default(self):
+        return self.__compute_defines(self.nx, self.ny)
+
+    @property
+    def north_south(self):
+        """
+        Gets the definitions used for a North/South kernel.
+        """
+        ny = self.ghost_cells.y + self.ghost_cells.north
+
+        return self.__compute_defines(self.nx, ny)
+
+    @property
+    def east_west(self):
+        """
+        Gets the definitions used for an East/West kernel.
+        """
+        nx = self.ghost_cells.x + self.ghost_cells.east
+        # Avoid double computation
+        ny = self.ny - self.ghost_cells.y
+
+        return self.__compute_defines(nx, ny)
+
+    @property
+    def inner(self):
+        """
+        Gets the definition used for the inner cells that do not require ghost cells.
+        """
+        nx = self.nx - self.ghost_cells.x
+        ny = self.ny - self.ghost_cells.y
+
+        return self.__compute_defines(nx, ny)

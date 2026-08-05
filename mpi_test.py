@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import math
 import os
 from argparse import ArgumentParser, ArgumentTypeError
 import time
@@ -96,7 +97,7 @@ parser.add_argument('--rescale', default=1, type=float, help="Rescales the domai
 output.add_argument('--netcdf', action='store_true', help='Output netCDF file')
 output.add_argument('-o', '--output', type=str, default="mpi_test.nc", help='Output location for netCDF file')
 output.add_argument('--include_ghostcells', action='store_false', help='Include ghost cells in the netCDF file')
-output.add_argument('--nc-only-last', action='store_true', help="Only stores the first and last parts of the simulation in the netCDF file.")
+output.add_argument('--nc-save-interval', type=float, help="Saves a snapshot of the simulator after given amount of seconds. Set to -1 to only save end.")
 output.add_argument('--profile', action='store_true')
 output.add_argument('--log_debug', action='store_true', help='Writes debug logs to a log file')
 output.add_argument('--progress-bar', action='store_true', help='Show progress bar.')
@@ -124,7 +125,8 @@ if rescale <= 0:
 write_netcdf: bool = args.netcdf
 netcdf_filename: str = args.output
 ignore_ghostcells = args.include_ghostcells
-nc_only_last: bool = args.nc_only_last
+nc_save_interval: float | None = args.nc_save_interval
+nc_interval = nc_save_interval is not None
 use_mpi: bool = args.mpi or args.mpi_np
 use_mpi_persistent = not args.mpi_np
 use_nccl: bool = args.nccl
@@ -197,7 +199,7 @@ if profiling:
     profiling_data['gpu_device'] = device
     profiling_data['n_processes'] = MPI.COMM_WORLD.size
     profiling_data['gpu_compile_args'] = compile_opts
-    profiling_data['netcdf_only_last'] = nc_only_last
+    profiling_data['netcdf_save_interval'] = nc_save_interval
     profiling_data['log_debug'] = log_debug
     init_data_type = 'bump'
     if norkyst_url is not None:
@@ -393,11 +395,11 @@ if warmup:
     if profiling:
         t_warmup_start = time.time()
 
-    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_only_last,
+    sim.step(t_end=warmup_t, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_interval,
              enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
-        if nc_only_last:
+        if nc_interval:
             sim.sim.writeState()
         sim.sim.sim_writer.sync()
 
@@ -426,12 +428,22 @@ for i in trange(run_times, disable=disable_tqdm):
     if profiling:
         t_sim_run_start = time.time()
 
+    t_step: float = args.t
+
+    if nc_interval:
+        for i in range(1, math.ceil(t_step / nc_save_interval)):
+            t_i_step = nc_save_interval
+            t = sim.step(t_end=t_i_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
+                 enable_progress_bar=not disable_tqdm)
+            sim.sim.writeState()
+            t_step -= t
+
     # Run simulator
-    t = sim.step(t_end=args.t, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_only_last,
+    t = sim.step(t_end=t_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
                  enable_progress_bar=not disable_tqdm)
     sim.sim.gpu_stream.synchronize()
     if sim.sim.write_netcdf:
-        if nc_only_last:
+        if nc_interval:
             sim.sim.writeState()
         sim.sim.sim_writer.sync()
 

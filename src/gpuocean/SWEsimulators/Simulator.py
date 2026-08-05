@@ -108,7 +108,7 @@ class Simulator(ABC):
         self.dy = float(dy)
         self.dt = dt
         self.g = float(g)
-        self.f = float(f)
+        self.f = np.float32(f)
         self.r = float(r)
         self.coriolis_beta = float(coriolis_beta)
         self.wind_stress = wind
