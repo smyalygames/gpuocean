@@ -216,7 +216,7 @@ class MPIWrapper:
         """
         return self.sim.arrays
 
-    def step(self, t_end=0.0, update_dt=False, split_step=True, write_now=True, enable_progress_bar=True):
+    def step(self, t_end=0.0, update_dt=False, split_step=True, write_now=True, enable_progress_bar=True) -> float:
         """
         Start simulation for given amount of time.
         :param t_end: Amount of seconds to simulate for. Leave at `0` for only computing one step.
@@ -233,12 +233,14 @@ class MPIWrapper:
         with tqdm(desc=f"Running a {t_end:.3f} second simulation", total=t_end, unit="ss", bar_format="{n:.3f}", disable=not enable_progress_bar) as pbar:
             while t_now < t_end:
                 t_now += self.sim.dt
-                self.sim.step(self.sim.dt, write_now=write_now, split_step=split_step)
+                t = self.sim.step(self.sim.dt, write_now=write_now, split_step=split_step)
 
                 pbar.update(self.sim.dt)
 
                 if update_dt:
                     self.update_dt()
+
+        return t
 
     def update_dt(self, courant_number: float = None):
         """
