@@ -304,7 +304,7 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
 
     # Coriolis angle and beta
     ic['angle'] = angle
-    ic['latitude'] = OceanographicUtilities.degToRad(latitude)
+    ic['latitude'] = np.deg2rad(latitude)
     ic['f'] = 0.0  # Set using latitude instead
     # The beta plane of doing it:
     # ic['f'], ic['coriolis_beta'] = OceanographicUtilities.calcCoriolisParams(OceanographicUtilities.degToRad(latitude[0, 0]))
