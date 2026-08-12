@@ -38,12 +38,25 @@ class HIPHandler(BaseGPUHandler):
                 if getattr(val, 'size', 1) != 1:
                     raise RuntimeError(f"Called a GPU function with a CPU array of size {val.size}.")
 
-                if isinstance(val, np.ndarray):
-                    scalar_val = val.flat[0]
-                else:
-                    scalar_val = val
+                dtype = val.dtype if hasattr(val, 'dtype') else np.dtype(type(val))
+                clean_val = val.item()
 
-                args[i] = np.ctypeslib.as_ctypes(scalar_val)
+                match dtype:
+                    case np.float32:
+                        args[i] = ctypes.c_float(clean_val)
+                    case np.float64:
+                        args[i] = ctypes.c_double(clean_val)
+                    case np.int32:
+                        args[i] = ctypes.c_int32(clean_val)
+                    case np.int64:
+                        args[i] = ctypes.c_int64(clean_val)
+                    case np.uint32:
+                        args[i] = ctypes.c_uint32(clean_val)
+                    case np.uint64:
+                        args[i] = ctypes.c_uint64(clean_val)
+                    case _:
+                        args[i] = np.ctypeslib.as_ctypes(clean_val)
+
             elif isinstance(val, types.Pointer) and val not in exchange_exclude:
                 pointers.append(val)
             elif isinstance(val, cp.cuda.MemoryPointer):
