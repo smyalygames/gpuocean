@@ -31,7 +31,8 @@ class HIPRandomNumbers(BaseRandomNumbers):
 
         # Parameters for generator
         elements = math.prod(array.shape)
-        pointer = array.pointer
+        pointer = getattr(array.pointer, 'ptr', array.pointer)
+
         mean = 0
         stddev = 1
 
@@ -47,7 +48,7 @@ class HIPRandomNumbers(BaseRandomNumbers):
 
         # Parameters for generator
         elements = math.prod(array.shape)
-        pointer = array.pointer
+        pointer = getattr(array.pointer, 'ptr', array.pointer)
 
         # Check if the array is 64/32-bit and generate uniform
         if array.double_precision:
