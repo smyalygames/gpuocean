@@ -470,7 +470,7 @@ class BoundaryConditionsData:
     """
 
     def __init__(self,
-                 t: list[float] = None,
+                 t: list[float] | None = None,
                  north=SingleBoundaryConditionData(),
                  south=SingleBoundaryConditionData(),
                  east=SingleBoundaryConditionData(),
@@ -484,7 +484,7 @@ class BoundaryConditionsData:
         self.west = west
 
         if t is not None:
-            self.t = t
+            self.t: list[float] = t
             self.numSteps = len(t)
 
         for data in [north, south, east, west]:
