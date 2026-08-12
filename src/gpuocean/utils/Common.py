@@ -326,7 +326,7 @@ class BoundaryConditions:
     def __init__(self,
                  north: BoundaryType=BoundaryType.WALL, east: BoundaryType=BoundaryType.WALL,
                  south: BoundaryType=BoundaryType.WALL, west: BoundaryType=BoundaryType.WALL,
-                 sponge_cells: SpongeCells = None):
+                 sponge_cells: SpongeCells | None = None):
         """
         There is one parameter for each of the cartesian boundaries.
         Values can be set as follows:
@@ -342,7 +342,7 @@ class BoundaryConditions:
         self.east = east
         self.south = south
         self.west = west
-        self.spongeCells = sponge_cells
+        self.spongeCells: SpongeCells = sponge_cells
 
         # Checking that periodic boundaries are periodic
         assert not ((self.north == BoundaryType.PERIODIC or self.south == BoundaryType.PERIODIC) and
