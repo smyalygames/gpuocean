@@ -166,8 +166,8 @@ class RandThroughOceanNoiseTest(OceanStateNoiseTestParent):
         else:
             self.assertIsNone(self.noise.rng.seed)
             self.assertIsNone(self.noise.rng.host_seed)
-            self.failUnlessRaises(AssertionError, self.noise.getSeed)
-            self.failUnlessRaises(AssertionError, self.noise.resetSeed)
+            self.assertRaises(AssertionError, self.noise.getSeed)
+            self.assertRaises(AssertionError, self.noise.resetSeed)
            
         
     def test_empty_reduction_buffer(self):

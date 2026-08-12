@@ -138,8 +138,8 @@ class RandomNumbersTest(unittest.TestCase):
         else:
             self.assertIsNone(self.rng.seed)
             self.assertIsNone(self.rng.host_seed)
-            self.failUnlessRaises(AssertionError, self.rng.getSeed)
-            self.failUnlessRaises(AssertionError, self.rng.resetSeed)
+            self.assertRaises(AssertionError, self.rng.getSeed)
+            self.assertRaises(AssertionError, self.rng.resetSeed)
            
     def test_seed_diff_lcg(self):
         self.seed_diff(lcg=True)
