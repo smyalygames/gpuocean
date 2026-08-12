@@ -362,7 +362,7 @@ def rescaleInitialConditions(old_ic, scale: float):
     return ic
 
 
-def getBoundaryConditionsData(source_url_list, timestep_indices: list, timesteps, x0, x1, y0, y1, norkyst_data):
+def getBoundaryConditionsData(source_url_list, timestep_indices: list | None, timesteps, x0, x1, y0, y1, norkyst_data):
     """
     timestep_indices => index into netcdf-array, e.g. [1, 3, 5]
     timestep => time at timestep, e.g. [1800, 3600, 7200]
