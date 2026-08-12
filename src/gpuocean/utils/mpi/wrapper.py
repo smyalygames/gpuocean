@@ -30,7 +30,7 @@ class MPIWrapper:
 
     def __init__(self, simulator_type: SimulatorType, global_nx: int, global_ny: int,
                  ghost_cells: tuple[int, int, int, int], strong_scale: bool = True,
-                 comm=MPI.COMM_WORLD, use_nccl=False, mpi_persistent=True, boundary_conditions=BoundaryConditions(), *args, **kwargs):
+                 comm=MPI.COMM_WORLD, use_nccl=False, mpi_persistent=True, boundary_conditions: BoundaryConditions | None =None, *args, **kwargs):
         """
         Creates a wrapper for the simulator, and the simulator chosen.
         :param simulator_type: Simulator type to create from the given arguments.
@@ -55,6 +55,13 @@ class MPIWrapper:
         self.grid = Grid(global_nx, global_ny, self.total_nodes, rank, strong_scale=strong_scale, use_nccl=use_nccl)
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
+
+        if boundary_conditions is None:
+            if "boundary_conditions" in kwargs:
+                boundary_conditions = kwargs["boundary_conditions"]
+            else:
+                boundary_conditions = BoundaryConditions()
+                self.logger.warning("No boundary conditions defined, using default boundary conditions %s", boundary_conditions)
 
         # Create boundary conditions
         boundary_conditions_args = {
