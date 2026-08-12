@@ -3,6 +3,7 @@ import ctypes
 from collections.abc import Iterable
 
 import cupy as cp
+import numpy as np
 from hip import hip
 from hip._util import types
 
@@ -33,6 +34,16 @@ class HIPHandler(BaseGPUHandler):
                 args[i] = ctypes.c_int32(val)
             elif isinstance(val, float):
                 args[i] = ctypes.c_float(val)
+            elif isinstance(val, (np.ndarray, np.generic)):
+                if getattr(val, 'size', 1) != 1:
+                    raise RuntimeError(f"Called a GPU function with a CPU array of size {val.size}.")
+
+                if isinstance(val, np.ndarray):
+                    scalar_val = val.flat[0]
+                else:
+                    scalar_val = val
+
+                args[i] = np.ctypeslib.as_ctypes(scalar_val)
             elif isinstance(val, types.Pointer) and val not in exchange_exclude:
                 pointers.append(val)
             elif isinstance(val, cp.cuda.MemoryPointer):
