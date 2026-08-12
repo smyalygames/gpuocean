@@ -92,4 +92,5 @@ class CuPyArray3D(BaseArray3D):
 
     def release(self) -> None:
         if self.holds_data:
-            self.data = None
+            del self.data
+            self.holds_data = False
