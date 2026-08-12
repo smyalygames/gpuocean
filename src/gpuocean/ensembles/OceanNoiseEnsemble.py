@@ -280,7 +280,7 @@ class OceanNoiseEnsemble(BaseOceanStateEnsemble.BaseOceanStateEnsemble):
         self.driftersPerOceanModel = driftersPerOceanModel
 
         for i in range(self.numParticles + 1):
-            self.particles[i] = CDKLM16.CDKLM16(self.gpu_ctx,
+            self.particles[i] = CDKLM16(self.gpu_ctx,
                                                 self.base_eta, self.base_hu, self.base_hv,
                                                 self.base_H,
                                                 self.nx, self.ny, self.dx, self.dy, self.dt,

@@ -119,7 +119,7 @@ class IEWPFOceanTest(unittest.TestCase):
 
         self.q0 = 0.5 * self.dt * self.f / (self.g * self.waterDepth)
 
-        self.sim = CDKLM16.CDKLM16(self.gpu_ctx, eta0, hu0, hv0, Hi,
+        self.sim = CDKLM16(self.gpu_ctx, eta0, hu0, hv0, Hi,
                                    self.nx, self.ny, self.dx, self.dy, self.dt,
                                    self.g, self.f, self.r,
                                    boundary_conditions=self.boundaryConditions,
