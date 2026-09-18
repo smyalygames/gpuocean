@@ -25,3 +25,6 @@ class HIPStream(Stream):
         Destroy the HIP Stream.
         """
         hip_check(hip.hipStreamDestroy(self._stream))
+
+    def make_default(self):
+        pass
