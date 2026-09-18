@@ -71,7 +71,7 @@ def plotState(eta, hu, hv, h,
     
     x_plots = 3
     y_plots = 1
-    if (add_extra == True):
+    if add_extra:
         x_plots=3
         y_plots=2
 
@@ -96,7 +96,7 @@ def plotState(eta, hu, hv, h,
     vor_cmap.set_bad(color='grey')
 
     
-    if (ax is None):
+    if ax is None:
         ax = [None]*x_plots*y_plots
         sp = [None]*x_plots*y_plots
 
@@ -127,7 +127,7 @@ def plotState(eta, hu, hv, h,
         plt.axis('image')
         plt.title("hv")
         
-        if (add_extra == True):
+        if add_extra == True:
             V = genVelocity(h, hu, hv)
             ax[3] = plt.subplot(y_plots, x_plots, 4)
             sp[3] = ax[3].imshow(V, interpolation="none", origin='lower', 
@@ -159,7 +159,7 @@ def plotState(eta, hu, hv, h,
         fig.sca(ax[2])
         sp[2].set_data(hv)
         
-        if (add_extra == True):
+        if add_extra == True:
             V = genVelocity(h, hu, hv)
             fig.sca(ax[3])
             sp[3].set_data(V)
@@ -251,12 +251,16 @@ def ncAnimation(filename, movie_frames=None, create_movie=True, fig=None,
         ncfile = Dataset(filename)
         x = ncfile.variables['x'][:]
         y = ncfile.variables['y'][:]
-        t = ncfile.variables['time'][:]
 
-        H_m = ncfile.variables['Hm'][:,:]
-        eta = ncfile.variables['eta'][:,:,:]
-        hu = ncfile.variables['hu'][:,:,:]
-        hv = ncfile.variables['hv'][:,:,:]
+        sim = ncfile.groups['GPUOceanSim']
+        run = sim.groups['run_0']
+
+        t = run.variables['time'][:]
+
+        H_m = ncfile.variables['references/Hm'][:,:]
+        eta = run.variables['eta'][:,:,:]
+        hu = run.variables['moments/u/hu'][:,:,:]
+        hv = ncfile.variables['moments/v/hv'][:,:,:]
     except Exception as e:
         raise e
     finally:

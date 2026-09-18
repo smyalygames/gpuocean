@@ -32,7 +32,7 @@ class SimNetCDFWriter:
                  super_dir: Optional[str | os.PathLike[str]] = None, filename: Optional[str] = None,
                  num_layers: int = 1, staggered_grid: bool = False, ignore_ghostcells: Optional[bool] = False,
                  offset_x: int = 0, offset_y: int = 0,
-                 write_parallel: bool = True, write_async: bool = False):
+                 write_parallel: bool = False, write_async: bool = False):
         """
         Writes simulator output to a netCDF file.
         :param sim: Simulator that will be used for the netCDF output.
