@@ -104,7 +104,7 @@ output.add_argument('--progress-bar', action='store_true', help='Show progress b
 
 # Mostly for benchmarking
 parser.add_argument('--warmup', action='store_true', help='Run a warmup simulation first before the main task')
-parser.add_argument('--warmup_t', type=int, default=10, help='Time to run the simulation for during a warmup')
+parser.add_argument('--warmup-t', type=int, default=10, help='Time to run the simulation for during a warmup')
 parser.add_argument('--run_times', type=min_run_times, default=1, help='Number of simulation runs to complete')
 
 exchange_method.add_argument('--mpi', action='store_true', help='Uses persistent MPI')
@@ -266,8 +266,8 @@ nx = args.nx
 ny = args.ny
 
 if norkyst_url is not None:
-    T_hours = 24
-    timestep_indices = [list(range(0, T_hours))]
+    T_hours = None # 24
+    timestep_indices = None # [list(range(0, T_hours))]
     case_name = 'complete_coast'
 
     if profiling:
@@ -431,12 +431,13 @@ for i in trange(run_times, disable=disable_tqdm):
     t_step: float = args.t
 
     if nc_interval:
+        t_end = 0
         for i in range(1, math.ceil(t_step / nc_save_interval)):
             t_i_step = nc_save_interval
-            t = sim.step(t_end=t_i_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
+            t_end = sim.step(t_end=t_i_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
                  enable_progress_bar=not disable_tqdm)
             sim.sim.writeState()
-            t_step -= t
+        t_step -= t_end
 
     # Run simulator
     t = sim.step(t_end=t_step, update_dt=dynamic_dt, split_step=split_step, write_now=not nc_interval,
@@ -483,11 +484,11 @@ if profiling:
 
     # if rank != 0:
     #     exit(0)
-    profiling_data['sim_nx'] = sim.sim.nx
-    profiling_data['sim_ny'] = sim.sim.ny
-    profiling_data['dt_end'] = sim.sim.dt
-    profiling_data['n_iterations'] = sim.sim.num_iterations
-    profiling_data['sim_time'] = sim.sim.t
+    profiling_data['sim_nx'] = int(sim.sim.nx)
+    profiling_data['sim_ny'] = int(sim.sim.ny)
+    profiling_data['dt_end'] = float(sim.sim.dt)
+    profiling_data['n_iterations'] = int(sim.sim.num_iterations)
+    profiling_data['sim_time'] = float(sim.sim.t)
 
     write_profiling()
 
