@@ -62,8 +62,7 @@ class CombinedCDKLM16test(unittest.TestCase):
     def tearDown(self):
         gc.collect() # Force run garbage collection to free up memory
 
-    # TODO revert back, seems to get stuck for some reason
-    def notest_combined_vs_single_sims(self):
+    def test_combined_vs_single_sims(self):
         """
         Test case: negative or positive wave going in or out, respectively, simulated individually and with combined time stepping
         """
