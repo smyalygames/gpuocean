@@ -93,8 +93,8 @@ class Simulator(ABC):
         # Notice that we need to specify them in the correct dataformat for the
         # CUDA kernel
         self.gpu_ctx = gpu_ctx
-        self.nx = int(nx)
-        self.ny = int(ny)
+        self.nx = np.int32(nx)
+        self.ny = np.int32(ny)
         self.ghost_cells = GhostCells(
             north=int(ghost_cells_x),
             south=int(ghost_cells_x),
@@ -102,20 +102,20 @@ class Simulator(ABC):
             west=int(ghost_cells_y)
         )
         # TODO remove these ghost cells to replace with the above variable.
-        self.ghost_cells_x = int(ghost_cells_x)
-        self.ghost_cells_y = int(ghost_cells_y)
-        self.dx = float(dx)
-        self.dy = float(dy)
+        self.ghost_cells_x = np.int32(ghost_cells_x)
+        self.ghost_cells_y = np.int32(ghost_cells_y)
+        self.dx = np.float32(dx)
+        self.dy = np.float32(dy)
         self.dt = dt
-        self.g = float(g)
+        self.g = np.float32(g)
         self.f = np.float32(f)
-        self.r = float(r)
-        self.coriolis_beta = float(coriolis_beta)
+        self.r = np.float32(r)
+        self.coriolis_beta = np.float32(coriolis_beta)
         self.wind_stress = wind
         if self.wind_stress.stress_u is None or self.wind_stress.stress_v is None:
             self.wind_stress.compute_wind_stress_from_wind()
         self.atmospheric_pressure = atmospheric_pressure
-        self.y_zero_reference_cell = float(y_zero_reference_cell)
+        self.y_zero_reference_cell = np.float32(y_zero_reference_cell)
 
         self.offset_x = offset_x
         self.offset_y = offset_y

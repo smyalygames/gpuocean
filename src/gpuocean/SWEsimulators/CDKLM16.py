@@ -362,7 +362,7 @@ class CDKLM16(Simulator.Simulator):
                                  0, 0, host_dt, padded=False)
         host_max_dt_buffer = np.zeros((1, 1), dtype=np.float32)
         self.max_dt_buffer = Array2D(self.gpu_stream, 1, 1, 0, 0, host_max_dt_buffer)
-        self.courant_number = courant_number
+        self.courant_number = np.float32(courant_number)
 
         ## Allocating memory for geostrophical equilibrium variables
         self.reportGeostrophicEquilibrium = int(reportGeostrophicEquilibrium)
@@ -534,7 +534,7 @@ class CDKLM16(Simulator.Simulator):
             # Calculate dt if using automatic dt
             if update_dt:
                 self.updateDt()
-            local_dt = min(self.dt, float(t_end - t_now))
+            local_dt = min(self.dt, np.float32(t_end - t_now))
 
             wind_stress_t = self.update_wind_stress(self.kernel)
             atmospheric_pressure_t = self.update_atmospheric_pressure(self.kernel)
@@ -1095,7 +1095,7 @@ class CDKLM16(Simulator.Simulator):
         if self.write_netcdf:
             self.sim_writer.write_timestep(self)
 
-    def updateDt(self, courant_number: float = None):
+    def updateDt(self, courant_number: np.float32 = None):
         """
         Updates the time step self.dt by finding the maximum size of dt according to the 
         CFL conditions, and scale it with the provided courant number (0.8 on default).
@@ -1121,12 +1121,12 @@ class CDKLM16(Simulator.Simulator):
                                                  self.device_dt.pointer,
                                                  self.max_dt_buffer.pointer])
 
-        dt_host = float(self.max_dt_buffer.download(self.gpu_stream)[0, 0])
+        dt_host = np.float32(self.max_dt_buffer.download(self.gpu_stream)[0, 0])
 
         if dt_host == 0:
             raise RuntimeError("Change in time (dt) is zero.")
 
-        self.dt = courant_number * float(dt_host)
+        self.dt = courant_number * dt_host
 
     def _getMaxTimestepHost(self, courant_number=0.8) -> float:
         """
