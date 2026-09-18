@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=MPI-GPUOcean-Weak-Scaling-Benchmark
+#SBATCH --job-name=MPI-NP-GPUOcean-Strong-Scaling
 #SBATCH --account=project_465002898
 
 
@@ -18,12 +18,15 @@ curr_time() {
 processes="${PROCESSES}"
 benchmark_id="${BENCHMARK_ID}"
 opt_params="${OPTIONAL_PARAMS}"
+parent_out_dir="${PARENT_OUT_DIR}"
 
-params="-nx=22000 -ny=22000 -dt=0.1 -t=100 --profile --weak-scale --mpi_np --warmup --run_times=3 ${opt_params}"
 project_dir=/project/project_465002898/anthony/gpuocean
+scratch_dir=/scratch/project_465002898
+netcdf_file="${scratch_dir}/${SLURM_JOB_ID}.nc"
+params="-nx=22000 -ny=22000 -dt=0 --profile --mpi_np --warmup --run_times=3 -o=${netcdf_file} ${opt_params}"
 application=${project_dir}/mpi_test.py
 container=${project_dir}/../gpuocean_0.0.13-lumi.sif
-data_out_dir=$project_dir/bench/weak/mpi-np_${benchmark_id}
+data_out_dir=$project_dir/bench/${parent_out_dir}/mpi-np_${benchmark_id}
 
 if [ "$processes" -ge 8 ]; then
   cpu_bind="map_cpu:49,57,17,25,1,9,33,41"
@@ -76,6 +79,7 @@ srun ${cpu_bind:+"--cpu-bind=${cpu_bind}"} --mpi=cray_shasta \
   singularity exec \
   --writable-tmpfs \
   --bind="${project_dir}" \
+  --bind="${scratch_dir}" \
   ${container} \
   bash -c "uv run --no-cache ${application} ${params}" || exit 1
 

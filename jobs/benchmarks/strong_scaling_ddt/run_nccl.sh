@@ -13,13 +13,27 @@ while getopts ":d" option; do
   esac
 done
 
+opt_params+="-t=100 --dynamic_dt"
+
 export OPTIONAL_PARAMS=$opt_params
+export PARENT_OUT_DIR="dyn-dt"
 
 benchmark_id=$(date +%s)
 export BENCHMARK_ID=$benchmark_id
-echo "Submitting MPI weak scaling test, with benchmark ID: ${benchmark_id}"
+echo "Submitting Dynamic dt NCCL strong scaling test, with benchmark ID: ${benchmark_id}"
 
-job=/project/project_465002898/anthony/gpuocean/jobs/benchmarks/weak_scaling/mpi-p.slurm
+job=/project/project_465002898/anthony/gpuocean/jobs/benchmarks/strong_scaling/nccl.slurm
+
+# Only for handling <1 node
+for processes in {0..2}; do
+  total_tasks=$((2**processes))
+
+  export PROCESSES=$total_tasks
+
+  # Default job settings
+  nodes=1
+  gpus_per_node=$total_tasks
+  partition="small-g"
 
   echo "Submitting ${total_tasks}-process job to ${partition} (${nodes} nodes)..."
 
@@ -28,8 +42,8 @@ job=/project/project_465002898/anthony/gpuocean/jobs/benchmarks/weak_scaling/mpi
     --nodes=$nodes \
     --ntasks-per-node=$gpus_per_node \
     --gpus-per-node=$gpus_per_node \
-    --time=00:40:00 \
-    --output="out/GPUOcean-mpi-weak-%j-${total_tasks}.out" \
+    --time=01:30:00 \
+    --output="out/GPUOcean-nccl-dynamic-dt-strong-%j-${total_tasks}.out" \
     $job "$benchmark_id"
 done
 
@@ -54,8 +68,8 @@ for nodes in "${gpus[@]}"; do
     --ntasks-per-node=$gpus_per_node \
     --gpus-per-node=$gpus_per_node \
     --exclusive \
-    --time=01:45:00 \
-    --output="out/GPUOcean-mpi-weak-%j-${total_tasks}.out" \
+    --time=01:00:00 \
+    --output="out/GPUOcean-nccl-dynamic-dt-strong-%j-${total_tasks}.out" \
     $job "$benchmark_id"
 done
 

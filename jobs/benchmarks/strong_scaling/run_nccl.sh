@@ -13,7 +13,10 @@ while getopts ":d" option; do
   esac
 done
 
+opt_params="-t=100"
+
 export OPTIONAL_PARAMS=$opt_params
+export PARENT_OUT_DIR="no-dyn"
 
 benchmark_id=$(date +%s)
 export BENCHMARK_ID=$benchmark_id
@@ -65,7 +68,7 @@ for nodes in "${gpus[@]}"; do
     --ntasks-per-node=$gpus_per_node \
     --gpus-per-node=$gpus_per_node \
     --exclusive \
-    --time=00:20:00 \
+    --time=00:05:00 \
     --output="out/GPUOcean-nccl-strong-%j-${total_tasks}.out" \
     $job "$benchmark_id"
 done

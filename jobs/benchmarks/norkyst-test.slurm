@@ -4,10 +4,9 @@
 #SBATCH --time=00:30:00
 #SBATCH --partition=dev-g
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --gpus-per-node=8
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
 #SBATCH --output=out/%x-%j.out
-#SBATCH --exclusive
 
 
 module load LUMI/25.09 partition/G
@@ -23,7 +22,7 @@ curr_time() {
 }
 
 ##### Variables ######
-processes=8
+processes=1
 
 norkyst_url="https://thredds.met.no/thredds/dodsC/fou-hi/norkyst800m-1h/NorKyst-800m_ZDEPTHS_his.an.2019071600.nc"
 project_dir=/project/project_465002898/anthony/gpuocean
@@ -31,7 +30,7 @@ application=${project_dir}/mpi_test.py
 container=${project_dir}/../gpuocean_0.0.13-lumi.sif
 data_out_dir=$project_dir/bench/test_norkyst_strong_scaling_nccl_${SLURM_JOB_ID}
 netcdf_file="${project_dir}/${SLURM_JOB_ID}.nc"
-params="-nx=4096 -ny=4096 -dt=0 --dynamic_dt -t=240 --profile --rescale --nccl --run_times=1 --netcdf -o=$netcdf_file --norkyst_url=$norkyst_url"
+params="-nx=4096 -ny=4096 -dt=0 --dynamic_dt -t=14400 --profile --rescale=1 --nccl --run_times=1 --netcdf -o=$netcdf_file --nc-save-interval=3600 --norkyst_url=$norkyst_url"
 
 if [ "$processes" -ge 8 ]; then
   cpu_bind="map_cpu:49,57,17,25,1,9,33,41"

@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=MPI-GPUOcean-Weak-Scaling-Benchmark
+#SBATCH --job-name=MPI-P-GPUOcean-Bandwidth-Benchmark
 #SBATCH --account=project_465002898
 
 
@@ -19,11 +19,11 @@ processes="${PROCESSES}"
 benchmark_id="${BENCHMARK_ID}"
 opt_params="${OPTIONAL_PARAMS}"
 
-params="-nx=22000 -ny=22000 -dt=0.1 -t=100 --profile --weak-scale --mpi_np --warmup --run_times=3 ${opt_params}"
+params="-nx=30000000 -ny=2 -dt=0.1 -t=10 --profile --weak-scale --mpi --warmup --warmup-t=1 --run_times=3 ${opt_params}"
 project_dir=/project/project_465002898/anthony/gpuocean
 application=${project_dir}/mpi_test.py
 container=${project_dir}/../gpuocean_0.0.13-lumi.sif
-data_out_dir=$project_dir/bench/weak/mpi-np_${benchmark_id}
+data_out_dir=$project_dir/bench/bandwidth/mpi-p_${benchmark_id}
 
 if [ "$processes" -ge 8 ]; then
   cpu_bind="map_cpu:49,57,17,25,1,9,33,41"

@@ -4,8 +4,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --partition=dev-g
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-node=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
 #SBATCH --output=out/%x-%j.out
 #SBATCH --exclusive
 
@@ -22,10 +22,10 @@ curr_time() {
 
 ##### Variables ######
 #params="-nx=512 -ny=512 --dynamic_dt --profile"
-params="-nx=2048 -ny=2048 -t=20 --mpi"
+params="-nx=4096 -ny=4096 -t=1 --mpi"
 project_dir=/project/project_465002898/anthony/gpuocean
 application=${project_dir}/mpi_test.py
-container=${project_dir}/../gpuocean_0.0.8-lumi.sif
+container=${project_dir}/../gpuocean_0.0.13-lumi.sif
 
 CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
 

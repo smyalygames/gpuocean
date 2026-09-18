@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=MPI-GPUOcean-Weak-Scaling-Benchmark
+#SBATCH --job-name=NCCL-GPUOcean-Bandwidth-Benchmark
 #SBATCH --account=project_465002898
 
 
@@ -8,6 +8,7 @@ module load rocm/6.4.4
 module load cray-mpich-abi/9.0.1
 module load lumi-CrayPath
 module load aws-ofi-nccl/1.18.0-rocm
+
 
 ##### Helper Functions #####
 curr_time() {
@@ -19,11 +20,11 @@ processes="${PROCESSES}"
 benchmark_id="${BENCHMARK_ID}"
 opt_params="${OPTIONAL_PARAMS}"
 
-params="-nx=22000 -ny=22000 -dt=0.1 -t=100 --profile --weak-scale --mpi_np --warmup --run_times=3 ${opt_params}"
+params="-nx=30000000 -ny=2 -dt=0.1 -t=10 --profile --weak-scale --nccl --run_times=3 ${opt_params}"
 project_dir=/project/project_465002898/anthony/gpuocean
 application=${project_dir}/mpi_test.py
 container=${project_dir}/../gpuocean_0.0.13-lumi.sif
-data_out_dir=$project_dir/bench/weak/mpi-np_${benchmark_id}
+data_out_dir=$project_dir/bench/bandwidth/nccl_${benchmark_id}
 
 if [ "$processes" -ge 8 ]; then
   cpu_bind="map_cpu:49,57,17,25,1,9,33,41"
@@ -33,10 +34,11 @@ fi
 
 export MPICH_GPU_SUPPORT_ENABLED=1
 export MPICH_OFI_NIC_POLICY=GPU
-export MPICH_GPU_IPC_THRESHOLD=1
-export HSA_ENABLE_SDMA=0
 #export MPICH_GPU_IPC_ENABLED=0
 #export MPICH_ENV_DISPLAY=1
+export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=INIT
+
 export HSA_FORCE_FINE_GRAIN_PCIE=1
 export FI_MR_CACHE_MONITOR=userfaultfd
 export FI_CXI_DISABLE_HOST_REGISTER=1
@@ -56,6 +58,10 @@ if [ "$processes" -gt 8 ]; then
   export NCCL_NET="OFI"
   export FI_CXI_RX_MATCH_MODE=hybrid
 fi
+
+export NCCL_IGNORE_CPU_AFFINITY=1
+export NCCL_NCHANNELS_PER_PEER=32
+
 
 ##### Running the job ######
 start_time=$(curr_time)
