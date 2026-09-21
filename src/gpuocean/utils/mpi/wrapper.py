@@ -242,7 +242,7 @@ class MPIWrapper:
                 t_now += self.sim.dt
                 self.sim.step(self.sim.dt, write_now=write_now, split_step=split_step)
 
-                pbar.update(self.sim.dt)
+                pbar.update(float(self.sim.dt))
 
                 if update_dt:
                     self.update_dt()
