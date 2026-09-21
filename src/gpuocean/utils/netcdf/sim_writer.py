@@ -380,18 +380,20 @@ class SimNetCDFWriter:
 
         self.time = run_group.createVariable('time', np.float64, ('time',))
         self.time.units = 'seconds since 1970-01-01 00:00:00'
-        self.time.set_collective(self.write_parallel)
 
         self.eta = run_group.createVariable('eta', np.float32, ('time', 'y', 'x'),
                                             zlib=True, complevel=self.comp_level)
-        self.eta.set_collective(self.write_parallel)
         moment_dims = ('time', 'y', 'x')
         self.hu = moment_u_group.createVariable('hu', np.float32, moment_dims,
                                                 zlib=True, complevel=self.comp_level)
-        self.hu.set_collective(self.write_parallel)
         self.hv = moment_v_group.createVariable('hv', np.float32, moment_dims,
                                                 zlib=True, complevel=self.comp_level)
-        self.hv.set_collective(self.write_parallel)
+
+        if self.write_parallel:
+            self.time.set_collective(self.write_parallel)
+            self.eta.set_collective(self.write_parallel)
+            self.hu.set_collective(self.write_parallel)
+            self.hv.set_collective(self.write_parallel)
 
         self.eta.standard_name = 'water_surface_height_above_reference_datum'
         self.hu.standard_name = 'x_sea_water_velocity'

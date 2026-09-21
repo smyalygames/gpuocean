@@ -252,15 +252,22 @@ def ncAnimation(filename, movie_frames=None, create_movie=True, fig=None,
         x = ncfile.variables['x'][:]
         y = ncfile.variables['y'][:]
 
-        sim = ncfile.groups['GPUOceanSim']
+        forecasts = ncfile.groups['forecasts']
+        sim = forecasts.groups['GPUOceanSim']
         run = sim.groups['run_0']
 
         t = run.variables['time'][:]
 
-        H_m = ncfile.variables['references/Hm'][:,:]
+        references = ncfile.groups['references']
+        H_m = references.variables['Hm'][:,:]
         eta = run.variables['eta'][:,:,:]
-        hu = run.variables['moments/u/hu'][:,:,:]
-        hv = ncfile.variables['moments/v/hv'][:,:,:]
+
+        moments = run.groups['moments']
+        u = moments.groups['u']
+        v = moments.groups['v']
+
+        hu = u.variables['hu'][:,:,:]
+        hv = v.variables['hv'][:,:,:]
     except Exception as e:
         raise e
     finally:
