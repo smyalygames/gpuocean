@@ -150,7 +150,7 @@ class BoundaryConditionsArakawaA:
 
             return EW_data
 
-        def upload(name: str, t_index: int):
+        def upload(name: str, t_index: int, ns_target, ew_target):
             gpu_stream.synchronize()
             self.logger.debug(f"Updating {name}")
 
@@ -158,13 +158,13 @@ class BoundaryConditionsArakawaA:
             S_data = pack_data_ns(self.bc_data.south, t_index)
             NS_data = np.vstack((S_data, N_data))
             NS_data = np.ascontiguousarray(NS_data)
-            self.bc_NS_current_arr.upload(gpu_stream, NS_data)
+            ns_target.upload(gpu_stream, NS_data)
 
             E_data = pack_data_ew(self.bc_data.east, t_index)
             W_data = pack_data_ew(self.bc_data.west, t_index)
             EW_data = np.hstack((W_data, E_data))
             EW_data = np.ascontiguousarray(EW_data)
-            self.bc_EW_current_arr.upload(gpu_stream, EW_data)
+            ew_target.upload(gpu_stream, EW_data)
 
             self.logger.debug(f"NS-Data is set to {str(NS_data)}, {str(NS_data.shape)}")
             self.logger.debug(f"EW-Data is set to {str(EW_data)}, {str(EW_data.shape)}")
@@ -173,10 +173,10 @@ class BoundaryConditionsArakawaA:
 
         # If the time interval has changed, upload new data
         if new_t0 != old_t0:
-            upload("T0", t0_index)
+            upload("T0", t0_index, self.bc_NS_current_arr, self.bc_EW_current_arr)
 
         if new_t1 != old_t1:
-            upload("T1", t1_index)
+            upload("T1", t1_index, self.bc_NS_next_arr, self.bc_EW_next_arr)
 
         # Update the bc_t linear interpolation coefficient
         elapsed_since_t0 = (t - new_t0)
