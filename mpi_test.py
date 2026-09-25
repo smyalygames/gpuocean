@@ -13,6 +13,7 @@ from mpi4py import MPI
 import numpy as np
 import numpy.typing as npt
 import cupy as cp
+from tqdm import trange
 
 from gpuocean.utils.gpu import KernelContext, gpu_device
 from gpuocean.utils.mpi import MPIWrapper
@@ -89,7 +90,7 @@ def min_run_times(value):
 
 parser.add_argument('-nx', type=int, default=128)
 parser.add_argument('-ny', type=int, default=128)
-parser.add_argument('-dt', type=float, default=0.1, help='Time step size')
+parser.add_argument('-dt', type=float, default=0, help='Time step size')
 parser.add_argument('-t', type=float, default=1000, help='Total simulation time to run for')
 parser.add_argument('--weak-scale', action='store_true', help='Do not do domain decomposition.')
 parser.add_argument('--dynamic_dt', action='store_true', help='Dynamically calculate time step')
@@ -268,7 +269,7 @@ ny = args.ny
 if norkyst_url is not None:
     T_hours = None # 24
     timestep_indices = None # [list(range(0, T_hours))]
-    case_name = 'complete_coast'
+    case_name = 'lofoten'
 
     if profiling:
         norkyst_info = {
@@ -432,10 +433,10 @@ for i in trange(run_times, disable=disable_tqdm):
 
     if nc_interval:
         t_end = 0
-        for i in range(1, math.ceil(t_step / nc_save_interval)):
+        for _ in trange(1, math.ceil(t_step / nc_save_interval), disable=disable_tqdm):
             t_i_step = nc_save_interval
             t_end = sim.step(t_end=t_i_step, update_dt=dynamic_dt, split_step=split_step, write_now=False,
-                 enable_progress_bar=not disable_tqdm)
+                 enable_progress_bar=False)
             sim.sim.writeState()
         t_step -= t_end
 
