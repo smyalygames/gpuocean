@@ -21,6 +21,9 @@ dependencies = [
     "tqdm",
 ]
 
+[tool.pytest.ini_options]
+pythonpath=["test"]
+
 [project.optional-dependencies]
 gpu = [
     "hip-python~=7.0.0",
