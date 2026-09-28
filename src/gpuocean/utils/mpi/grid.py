@@ -1,5 +1,6 @@
 from typing import Literal, ClassVar
 from numbers import Number
+from mpi4py import MPI
 from dataclasses import dataclass, field
 import math
 
@@ -170,7 +171,10 @@ class Grid:
         if self.total_nodes == 1:
             return (1, 1)
 
-        return (1, self.total_nodes)
+        # return (1, self.total_nodes)
+        dims = MPI.Compute_dims(self.total_nodes, 2)
+
+        return dims[0], dims[1]
 
     def _calculate_coordinate(self) -> Coordinate:
         """
