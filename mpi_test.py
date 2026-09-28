@@ -367,6 +367,8 @@ if profiling:
 sim = MPIWrapper(SimulatorType.CDKLM16, nx, ny, ghosts, strong_scale, comm, use_nccl, use_mpi_persistent, *sim_args, **kwargs)
 
 if profiling:
+    profiling_data['px'] = sim.grid.nodes_x
+    profiling_data['py'] = sim.grid.nodes_y
     t_sim_init_end = time.time()
     t_init_end = time.time()
 
