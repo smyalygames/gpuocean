@@ -43,20 +43,20 @@ class Grid:
     y0: int
     y1: int
 
-    def __init__(self, nx: int, ny: int, total_nodes: int, rank: int, strong_scale=True, use_nccl=False):
+    def __init__(self, nx: int, ny: int, comm: MPI.Intracomm, strong_scale=True, periodic=False):
         """
         Creates a grid for the given domain.
         :param nx: Size of the domain in the x-axis.
         :param ny: Size of the domain in the y-axis.
-        :param total_nodes: Total number of compute nodes.
-        :param rank: Rank of this current process.
-        :param strong_scale: Decompose the domain in regard to strong scaling
+        :param comm: MPI Communication context.
+        :param strong_scale: Decompose the domain in regard to strong scaling.
+        :param periodic: Allowing exchanges to be periodic around the global borders.
         """
 
         Grid.global_nx = nx
         Grid.global_ny = ny
-        self.total_nodes = total_nodes
-        self.rank = rank
+        self.total_nodes = comm.size
+        self.rank = comm.rank
         self.strong_scale = strong_scale
 
         # Subdomain grid size
@@ -74,10 +74,17 @@ class Grid:
         Coordinate.nodes_x = self.nodes_x
         Coordinate.nodes_y = self.nodes_y
 
+        self.cart_comm = comm.Create_cart(
+            dims=[self.nodes_x, self.nodes_y],
+            periods=[periodic, periodic],
+            reorder=True
+        )
+
+        self.rank = self.cart_comm.Get_rank()
+        Grid.x_pos, Grid.y_pos = self.cart_comm.Get_coords(self.rank)
+
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
-        Grid.x_pos = self.location.x
-        Grid.y_pos = self.location.y
 
         # Calculate the size of the local subdomain
         if strong_scale:
@@ -92,10 +99,10 @@ class Grid:
         Grid.y0, Grid.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
-        self.north = self.get_neighbor(Direction.NORTH)
-        self.east = self.get_neighbor(Direction.EAST)
-        self.south = self.get_neighbor(Direction.SOUTH)
-        self.west = self.get_neighbor(Direction.WEST)
+        _, self.north = self.cart_comm.Shift(0, 1)
+        _, self.east = self.cart_comm.Shift(0, -1)
+        _, self.south = self.cart_comm.Shift(1, 1)
+        _, self.west = self.cart_comm.Shift(1, -1)
 
     def _calculate_perimeter[T: int | float](self, x: T, y: T) -> T:
         """
