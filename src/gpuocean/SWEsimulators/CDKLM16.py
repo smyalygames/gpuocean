@@ -311,26 +311,26 @@ class CDKLM16(Simulator.Simulator):
                                          jit_compile_args=jit_compile_args
                                          )
 
-        self.kernel_ns = gpu_ctx.get_kernel("CDKLM16_kernel",
-                                            defines=defines.north_south,
-                                            compile_args=compile_args,
-                                            jit_compile_args=jit_compile_args)
-
-        self.kernel_ew = gpu_ctx.get_kernel("CDKLM16_kernel",
-                                            defines=defines.east_west,
-                                            compile_args=compile_args,
-                                            jit_compile_args=jit_compile_args)
-
-        self.kernel_inner = gpu_ctx.get_kernel("CDKLM16_kernel",
-                                               defines=defines.inner,
-                                               compile_args=compile_args,
-                                               jit_compile_args=jit_compile_args)
+        # self.kernel_ns = gpu_ctx.get_kernel("CDKLM16_kernel",
+        #                                     defines=defines.north_south,
+        #                                     compile_args=compile_args,
+        #                                     jit_compile_args=jit_compile_args)
+        #
+        # self.kernel_ew = gpu_ctx.get_kernel("CDKLM16_kernel",
+        #                                     defines=defines.east_west,
+        #                                     compile_args=compile_args,
+        #                                     jit_compile_args=jit_compile_args)
+        #
+        # self.kernel_inner = gpu_ctx.get_kernel("CDKLM16_kernel",
+        #                                        defines=defines.inner,
+        #                                        compile_args=compile_args,
+        #                                        jit_compile_args=jit_compile_args)
 
         # Get CUDA functions and define data types for prepared_{async_}call()
         self.cdklm_swe_2D = GPUHandler(self.kernel, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
-        self.cdklm_swe_2D_nw = GPUHandler(self.kernel_ns, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
-        self.cdklm_swe_2D_ew = GPUHandler(self.kernel_ew, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
-        self.cdklm_swe_2D_inner = GPUHandler(self.kernel_inner, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        # self.cdklm_swe_2D_nw = GPUHandler(self.kernel_ns, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        # self.cdklm_swe_2D_ew = GPUHandler(self.kernel_ew, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
+        # self.cdklm_swe_2D_inner = GPUHandler(self.kernel_inner, "cdklm_swe_2D", "fiPiPiPiPiPiPiPiPifPPPPfPPPPfi")
         self.update_wind_stress(self.kernel)
         self.update_atmospheric_pressure(self.kernel)
 
@@ -741,6 +741,7 @@ class CDKLM16(Simulator.Simulator):
         boundary_conditions = boundary_conditions | (int(self.boundary_conditions.south) << 16)
         boundary_conditions = boundary_conditions | (int(self.boundary_conditions.east) << 8)
         boundary_conditions = boundary_conditions | (int(self.boundary_conditions.west) << 0)
+        boundary_conditions = np.int32(boundary_conditions)
 
         self.cdklm_swe_2D.async_call(self.global_size, self.local_size, self.gpu_stream,
                                      [local_dt,
@@ -795,6 +796,7 @@ class CDKLM16(Simulator.Simulator):
         Used for splitting up computing the entire domain. This function is used for calculating the inner domain.
         Only computes interior cells that haven't been computed by call_outer_kernel.
         """
+        raise NotImplementedError("Async halo computations are not implemented yet.")
         # As it's the inner domain, boundary conditions should be ignored
         boundary_conditions = 0
 
@@ -838,6 +840,7 @@ class CDKLM16(Simulator.Simulator):
                           h_in: Array2D, hu_in: Array2D, hv_in: Array2D,
                           h_out: Array2D, hu_out: Array2D, hv_out: Array2D,
                           local_dt: float, wind_stress_t: float, atmospheric_pressure_t: float, rk_step: int):
+        raise NotImplementedError("Async halo computations are not implemented yet.")
 
         boundary_ns = 0
         boundary_ew = 0
