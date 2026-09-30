@@ -99,19 +99,23 @@ class Grid:
         Grid.y0, Grid.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
-        _, self.north = self.cart_comm.Shift(0, 1)
-        _, self.east = self.cart_comm.Shift(0, -1)
-        _, self.south = self.cart_comm.Shift(1, 1)
-        _, self.west = self.cart_comm.Shift(1, -1)
+        _, cart_east = self.cart_comm.Shift(0, 1)
+        _, cart_west = self.cart_comm.Shift(0, -1)
+        _, cart_north = self.cart_comm.Shift(1, 1)
+        _, cart_south = self.cart_comm.Shift(1, -1)
 
-        if self.north == MPI.PROC_NULL:
-            self.north = None
-        if self.east == MPI.PROC_NULL:
-            self.east = None
-        if self.south == MPI.PROC_NULL:
-            self.south = None
-        if self.west == MPI.PROC_NULL:
-            self.west = None
+        cart_group = self.cart_comm.Get_group()
+        world_group = comm.Get_group()
+
+        def translate(c_rank):
+            if c_rank == MPI.PROC_NULL or c_rank is None:
+                return None
+            return MPI.Group.Translate_ranks(cart_group, [c_rank], world_group)[0]
+
+        self.north = translate(cart_north)
+        self.east = translate(cart_east)
+        self.south = translate(cart_south)
+        self.west = translate(cart_west)
 
     def _calculate_perimeter[T: int | float](self, x: T, y: T) -> T:
         """
@@ -258,7 +262,7 @@ class Grid:
 
         return nx, ny
 
-    def get_neighbor(self, direction: Direction) -> Coordinate | None:
+    def get_neighbor(self, direction: Direction) -> int | None:
         """
         Gets the coordinate of the neighboring process.
         This function would be useful for data exchanges.
@@ -266,33 +270,9 @@ class Grid:
         :returns: Coordinate of the next cell over. None if there does not exist a neighbor in that direction.
         """
         match direction:
-            case Direction.NORTH:
-                new_y = self.location.y + 1
-                # Check if the new y location goes out of bounds of the grid
-                if new_y >= self.nodes_y:
-                    return None
-
-                return Coordinate(self.location.x, new_y)
-            case Direction.SOUTH:
-                # Check if the current rank is in the southernly most point
-                if self.location.y == 0:
-                    return None
-
-                new_y = self.location.y - 1
-                return Coordinate(self.location.x, new_y)
-            case Direction.EAST:
-                new_x = self.location.x + 1
-                # Check if the new x location goes out of bounds of the grid
-                if new_x >= self.nodes_x:
-                    return None
-
-                return Coordinate(new_x, self.location.y)
-            case Direction.WEST:
-                # Checks if the current location is in the westerly most position already
-                if self.location.x == 0:
-                    return None
-
-                new_x = self.location.x - 1
-                return Coordinate(new_x, self.location.y)
+            case Direction.NORTH: return self.north
+            case Direction.SOUTH: return self.south
+            case Direction.EAST: return self.east
+            case Direction.WEST: return self.west
             case _:
                 raise ValueError("Did not correctly specify the direction of the neighbouring coordinate.")

@@ -44,15 +44,16 @@ class MPIWrapper:
         :param kwargs: Keyword arguments for the specified simulator.
         """
         self.logger = logging.getLogger(__name__)
-        self.comm = comm
-        self.total_nodes = self.comm.size
-        rank = self.comm.rank
+        self.total_nodes = comm.size
+        rank = comm.rank
 
         self.logger.info(f"Rank: {rank}, Total Ranks: {self.total_nodes}.")
 
         self.global_nx = global_nx
         self.global_ny = global_ny
         self.grid = Grid(global_nx, global_ny, comm=comm, strong_scale=strong_scale)
+        self.comm = comm
+        # self.logger.info(f"New rank: {self.comm.rank}, old: {rank}.")
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 

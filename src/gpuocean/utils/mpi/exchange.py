@@ -92,7 +92,7 @@ class MPIExchange:
                 recv_buf = array.download_boundary(self.sim_stream, download_direction, copy=False, ghost_cells=True)
 
                 if self.mpi_persistent:
-                    exchange_rank = self.grid.get_neighbor(direction).rank
+                    exchange_rank = self.grid.get_neighbor(direction)
                     send_tag, recv_tag = exchanges.get_tags(self.step_number, self.total_arrays, direction)
                     exchanges[direction] = ExchangeMPI(send=send_buf, recv=recv_buf,
                                                        send_tag=send_tag, recv_tag=recv_tag,
@@ -164,7 +164,7 @@ class MPIExchange:
                 send_iteration = f"run/exchange/send/{exchange.index}/{direction.name.lower()}"
                 RangePush(send_iteration)
 
-                exchange_rank = self.grid.get_neighbor(direction).rank
+                exchange_rank = self.grid.get_neighbor(direction)
                 send_tag, recv_tag = exchange.get_tags(self.step_number, self.total_arrays, direction)
                 array_exchange = self.exchange_arrays[array][direction]
 
@@ -264,7 +264,7 @@ class MPIExchange:
         # Send MPI data.
         for array, exchange in exchanges.items():
             for direction in self.exists:
-                exchange_rank = self.grid.get_neighbor(direction).rank
+                exchange_rank = self.grid.get_neighbor(direction)
                 array_exchange = self.exchange_arrays[array][direction]
 
                 self.logger.debug("Sending from %d to %d (%s), shape: (%d, %d).",
@@ -302,7 +302,7 @@ class MPIExchange:
             for direction in self.exists:
                 RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}")
                 self.logger.debug("Exchanging for %s", direction.name)
-                exchange_rank = self.grid.get_neighbor(direction).rank
+                exchange_rank = self.grid.get_neighbor(direction)
                 array_exchange = exchanges[array][direction]
 
                 send_buf: cp.ndarray = array_exchange.send
