@@ -104,6 +104,15 @@ class Grid:
         _, self.south = self.cart_comm.Shift(1, 1)
         _, self.west = self.cart_comm.Shift(1, -1)
 
+        if self.north == MPI.PROC_NULL:
+            self.north = None
+        if self.east == MPI.PROC_NULL:
+            self.east = None
+        if self.south == MPI.PROC_NULL:
+            self.south = None
+        if self.west == MPI.PROC_NULL:
+            self.west = None
+
     def _calculate_perimeter[T: int | float](self, x: T, y: T) -> T:
         """
         Calculates the perimeter of the exchange region from the global domain.

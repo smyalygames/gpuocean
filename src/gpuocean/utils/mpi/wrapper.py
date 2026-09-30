@@ -52,7 +52,7 @@ class MPIWrapper:
 
         self.global_nx = global_nx
         self.global_ny = global_ny
-        self.grid = Grid(global_nx, global_ny, self.total_nodes, rank, strong_scale=strong_scale, use_nccl=use_nccl)
+        self.grid = Grid(global_nx, global_ny, comm=comm, strong_scale=strong_scale)
         self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
                           f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
