@@ -96,6 +96,7 @@ parser.add_argument('--weak-scale', action='store_true', help='Do not do domain 
 parser.add_argument('--dynamic_dt', action='store_true', help='Dynamically calculate time step')
 parser.add_argument('--rescale', default=1, type=float, help="Rescales the domain.")
 parser.add_argument('--cache-norkyst', action='store_true', help='Caches the Norkyst base data')
+parser.add_argument('--norkyst-cache-dir', type=str, help='Specify where to read/store Norkyst data cache')
 output.add_argument('--netcdf', action='store_true', help='Output netCDF file')
 output.add_argument('-o', '--output', type=str, default="mpi_test.nc", help='Output location for netCDF file')
 output.add_argument('--include_ghostcells', action='store_false', help='Include ghost cells in the netCDF file')
@@ -125,6 +126,7 @@ rescale: int = args.rescale
 if rescale <= 0:
     raise RuntimeError(f"Rescaling has to be greater than 0. Got: {rescale}.")
 cache_norkyst: bool = args.cache_norkyst
+norkyst_dir: str | None = args.norkyst_cache_dir
 write_netcdf: bool = args.netcdf
 netcdf_filename: str = args.output
 ignore_ghostcells = args.include_ghostcells
@@ -286,7 +288,8 @@ if norkyst_url is not None:
     if rank == 0:
         kwargs: dict[str, Any] = getInitialConditionsNorKystCases(norkyst_url, case_name,
                                                                   download_data=cache_norkyst,
-                                                                  timestep_indices=timestep_indices)
+                                                                  timestep_indices=timestep_indices,
+                                                                  cache_dir=cache_norkyst)
     else:
         kwargs = None
 

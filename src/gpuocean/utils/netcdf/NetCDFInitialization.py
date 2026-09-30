@@ -87,7 +87,8 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
                          iterations=10,
                          sponge_cells=SpongeCells(north=20, south=20, east=20, west=20),
                          erode_land=0,
-                         download_data=False
+                         download_data=False,
+                         cache_dir: str | None = None
                          ):
     """
     Constructing input arguments for CDKLM16 instances
@@ -105,7 +106,7 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
     num_files = len(source_url_list)
 
     for i in range(len(source_url_list)):
-        source_url_list[i] = checkCachedNetCDF(source_url_list[i], download_data=download_data)
+        source_url_list[i] = checkCachedNetCDF(source_url_list[i], download_data=download_data, cache_dir=cache_dir)
 
     # Get time steps:
     if norkyst_data:
@@ -690,7 +691,7 @@ def in_ipynb():
         return False
 
 
-def checkCachedNetCDF(source_url, download_data=True):
+def checkCachedNetCDF(source_url, download_data=True, cache_dir: str | None = None):
     """ 
     Checks if the file represented by source_url is available locally already.
     We search for the file in the working directory, or in a folder called 
@@ -700,7 +701,8 @@ def checkCachedNetCDF(source_url, download_data=True):
     """
     ### Check if local file exists:
     filename = os.path.abspath(os.path.basename(source_url))
-    cache_folder = 'netcdf_cache'
+    if cache_dir is None:
+        cache_folder = 'netcdf_cache'
     cache_filename = os.path.abspath(os.path.join(cache_folder,
                                                   os.path.basename(source_url)))
 
