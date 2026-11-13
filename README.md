@@ -25,6 +25,49 @@ GPU Ocean aims to be a powerful tool to complement ocean current forecasts throu
 ## Installation
 See [here](https://github.com/gpuocean/gpuocean/wiki/Installation).
 
+## Mass and momentum validation
+
+`validate_conservation.py` runs a periodic, flat-bottom CDKLM16 experiment with
+no external forcing, Coriolis or friction. It checks mass and both momentum
+components for either fixed or dynamically calculated timesteps. The default
+256 x 256 domain has 10 m cells and 60 m depth; its gravity-wave crossing time
+is approximately 106 seconds. The default 1,000-second run covers about 9.5
+crossings. Use `--duration 180` for a shorter pilot.
+
+With the project's GPU dependencies installed, for example on ROCm 6.4:
+
+```bash
+uv sync --locked --extra lumi --inexact
+uv run --no-sync python validate_conservation.py --dt 0.05 --output fixed.csv
+uv run --no-sync python validate_conservation.py --dynamic-dt --output dynamic.csv
+mpiexec -n 2 uv run --no-sync python validate_conservation.py --dt 0.05 --output mpi-fixed.csv
+mpiexec -n 2 uv run --no-sync python validate_conservation.py --dynamic-dt --output mpi-dynamic.csv
+```
+
+Use the GPU extra appropriate for your system. Multiple ranks require a
+GPU-aware MPI implementation; persistent MPI is the default, with
+`--mpi-nonpersistent` available as an alternative. Diagnostics are reduced
+across ranks and written by rank zero, so parallel NetCDF is not required.
+Output files must not already exist. Without `--output`, CSV is written to
+standard output. Multi-rank periodic boundaries currently require strong
+scaling (a single global domain decomposed across ranks).
+
+The CSV reports actual simulation times, iteration counts, cumulative minimum
+and maximum timestep, integrals, and signed relative drifts. Mass includes
+the mean water depth; the separate mass-anomaly drift is normalized by the
+initial excess mass above that depth. Momentum drifts are normalized by the
+nonzero initial momentum in each direction. Integrals use float64 accumulation
+over interior cells, excluding halos. Diagnostics are sampled after the first
+step at or beyond each `--interval` (default 10 seconds), and at the final
+time. The last timestep may be shortened to reach the final time.
+
+The command fails if a sampled absolute relative drift exceeds `--tolerance`
+(default `1e-5`), a value becomes non-finite, or the fixed timestep exceeds the
+calculated CFL limit at any step. The tolerance is a validation starting point,
+not a universal error bound; calibrate it for the intended hardware and run.
+This experiment does not validate forced, open-boundary, or variable-depth
+simulations.
+
 ## Academic publications using GPU Ocean
 * F. Beiser, H. Holm, K. Lye, J. Eidsvik (2025) **Multi-Level Data Assimilation for Ocean Forecasting using the Shallow-Water Equations**, *Journal of Computational Physics*, vol 524, 113722. DOI: [10.1016/j.jcp.2025.113722](https://doi.org/10.1016/j.jcp.2025.113722)
 * F. Beiser, H. Holm, M. Sætra, N. Kristensen, K. Christensen (2024) **Combining Barotropic and Baroclinic Simplified Models for Drift Trajectory Predictions**, *Journal of Operational Oceanography*, 17(3), 187-206. DOI: [10.1080/1755876X.2024.2364975](https://doi.org/10.1080/1755876X.2024.2364975)

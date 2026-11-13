@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable
 import logging
 from dataclasses import dataclass, field
-from concurrent.futures import ThreadPoolExecutor, wait
 
 from mpi4py import MPI
 import cupy as cp
@@ -17,7 +16,6 @@ if TYPE_CHECKING:
     from mpi4py.MPI import Request, Prequest, Comm
     from gpuocean.utils.gpu import Array2D, Array3D, GPUStream
     from .grid import Grid
-    from concurrent.futures import Future
 
 
 class MPIExchange:
@@ -49,7 +47,6 @@ class MPIExchange:
         self.using_nccl = True
         self.nccl: NCCLBackend | None = None
         self.nccl_comm: nccl.NcclCommunicator | None = None
-        self.mpi_executor: ThreadPoolExecutor | None = None
 
         if nccl_id is not None:
             rank = comm.rank
@@ -57,9 +54,6 @@ class MPIExchange:
             self.nccl_comm = nccl.NcclCommunicator(world_size, nccl_id, rank)
         elif not use_mpi:
             self.nccl = NCCLBackend(comm.size, comm.rank)
-
-        if use_mpi:
-            self.mpi_executor = ThreadPoolExecutor()
 
         self.logger.info("CuPy is using device %d.", cp.cuda.runtime.getDevice())
 
@@ -107,8 +101,6 @@ class MPIExchange:
             self.nccl_comm.destroy()
         if self.nccl is not None:
             self.nccl.stop()
-        if self.mpi_executor is not None:
-            self.mpi_executor.shutdown()
 
     def _prepare_exchanges(self, gpu_stream: GPUStream, exchanges: dict[Array2D, ArrayExchange] = None):
         """
@@ -236,9 +228,7 @@ class MPIExchange:
         MPI.Prequest.Startall(comm_recv)
         RangePop()
         RangePush("run/exchange/send/prequest/send")
-        send_futures: list[Future] = []
-        for send in comm_send:
-            send_futures.append(self.mpi_executor.submit(MPI.Prequest.Startall, comm_send))
+        MPI.Prequest.Startall(comm_send)
         RangePop()
 
         for i in range(len(directions)):
@@ -248,8 +238,6 @@ class MPIExchange:
 
             # arrays[index].upload_direction(directions[index], self.exchange_stream)
             arrays[index].upload_direction(directions[index], self.sim_stream)
-
-        wait(send_futures)
 
         MPI.Request.Waitall(comm_send)
         RangePop()
@@ -306,8 +294,6 @@ class MPIExchange:
                 array_exchange = exchanges[array][direction]
 
                 send_buf: cp.ndarray = array_exchange.send
-                recv_buf: cp.ndarray = array_exchange.recv
-
                 nccl_dtype = _NCCL_DTYPE_MAP[send_buf.dtype]
 
                 self.logger.debug(
@@ -318,10 +304,14 @@ class MPIExchange:
                 RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}/send")
                 self.nccl_comm.send(send_buf.data.ptr, send_buf.size, nccl_dtype, exchange_rank, stream_ptr)
                 RangePop()
-                RangePush(f"run/exchange/send/{exchange.index}/{direction.name.lower()}/recv")
-                self.nccl_comm.recv(recv_buf.data.ptr, recv_buf.size, nccl_dtype, exchange_rank, stream_ptr)
                 RangePop()
-                RangePop()
+            # NCCL has no tags: receives from the same peer must match the
+            # peer's sends in opposite-direction order.
+            for direction in sorted(self.exists, key=lambda d: d.opposite):
+                exchange_rank = self.grid.get_neighbor(direction)
+                recv_buf = exchange[direction].recv
+                self.nccl_comm.recv(recv_buf.data.ptr, recv_buf.size, _NCCL_DTYPE_MAP[recv_buf.dtype],
+                                    exchange_rank, stream_ptr)
             RangePop()
 
         nccl.groupEnd()
@@ -386,22 +376,12 @@ class ArrayExchange:
         Updates the send arrays in each direction if there is one defined.
         """
         RangePush(f"run/exchange/prepare/{self.index}")
-        if self.north is not None and self.north.copy:
-            RangePush(f"run/exchange/prepare/{self.index}/north")
-            cp.copyto(self.north.send, self.array.download_boundary(gpu_stream, "south", copy=False))
-            RangePop()
-        if self.east is not None and self.east.copy:
-            RangePush(f"run/exchange/prepare/{self.index}/east")
-            cp.copyto(self.east.send, self.array.download_boundary(gpu_stream, "east", copy=False))
-            RangePop()
-        if self.south is not None and self.south.copy:
-            RangePush(f"run/exchange/prepare/{self.index}/south")
-            cp.copyto(self.south.send, self.array.download_boundary(gpu_stream, "north", copy=False))
-            RangePop()
-        if self.west is not None and self.west.copy:
-            RangePush(f"run/exchange/prepare/{self.index}/west")
-            cp.copyto(self.west.send, self.array.download_boundary(gpu_stream, "west", copy=False))
-            RangePop()
+        with gpu_stream._cupy_stream:
+            for direction in Direction:
+                exchange = self[direction]
+                if exchange is not None and exchange.copy:
+                    cp.copyto(exchange.send, self.array.download_boundary(
+                        gpu_stream, direction.name.lower(), copy=False))
         RangePop()
 
     def upload_received(self, gpu_stream):
@@ -411,7 +391,7 @@ class ArrayExchange:
         RangePush(f"run/exchange/send/upload/{self.index}")
         if self.north is not None and self.north.copy:
             RangePush(f"run/exchange/send/upload/{self.index}/north")
-            self.array.upload_boundary(gpu_stream, self.north.recv, "south")
+            self.array.upload_boundary(gpu_stream, self.north.recv, "north")
             RangePop()
         if self.east is not None and self.east.copy:
             RangePush(f"run/exchange/send/upload/{self.index}/east")
@@ -419,7 +399,7 @@ class ArrayExchange:
             RangePop()
         if self.south is not None and self.south.copy:
             RangePush(f"run/exchange/send/upload/{self.index}/south")
-            self.array.upload_boundary(gpu_stream, self.south.recv, "north")
+            self.array.upload_boundary(gpu_stream, self.south.recv, "south")
             RangePop()
         if self.west is not None and self.west.copy:
             RangePush(f"run/exchange/send/upload/{self.index}/west")

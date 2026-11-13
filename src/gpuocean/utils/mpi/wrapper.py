@@ -51,18 +51,25 @@ class MPIWrapper:
 
         self.global_nx = global_nx
         self.global_ny = global_ny
-        self.grid = Grid(global_nx, global_ny, comm=comm, strong_scale=strong_scale)
-        self.comm = comm
-        # self.logger.info(f"New rank: {self.comm.rank}, old: {rank}.")
-        self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
-                          f"from global domain size ({self.global_nx}, {self.global_ny}).")
-
         if boundary_conditions is None:
             if "boundary_conditions" in kwargs:
                 boundary_conditions = kwargs["boundary_conditions"]
             else:
                 boundary_conditions = BoundaryConditions()
                 self.logger.warning("No boundary conditions defined, using default boundary conditions %s", boundary_conditions)
+
+        if (not strong_scale and self.total_nodes > 1 and
+                (boundary_conditions.isPeriodicEastWest() or boundary_conditions.isPeriodicNorthSouth())):
+            raise NotImplementedError("Multi-rank periodic boundaries require strong scaling")
+
+        self.grid = Grid(global_nx, global_ny, comm=comm, strong_scale=strong_scale,
+                         periodic=(boundary_conditions.isPeriodicEastWest(),
+                                   boundary_conditions.isPeriodicNorthSouth()))
+        self.periodic_x = boundary_conditions.isPeriodicEastWest()
+        self.periodic_y = boundary_conditions.isPeriodicNorthSouth()
+        self.comm = comm
+        self.logger.debug(f"Decomposed domain is: ({self.grid.local_nx}, {self.grid.local_ny}) "
+                          f"from global domain size ({self.global_nx}, {self.global_ny}).")
 
         # Create boundary conditions
         boundary_conditions_args = {
@@ -73,12 +80,18 @@ class MPIWrapper:
             'sponge_cells': boundary_conditions.spongeCells
         }
 
-        if not boundary_conditions.isPeriodicNorthSouth():
+        if boundary_conditions.isPeriodicNorthSouth() and self.grid.nodes_y > 1:
+            boundary_conditions_args['north'] = BoundaryType.DIRICHLET
+            boundary_conditions_args['south'] = BoundaryType.DIRICHLET
+        elif not boundary_conditions.isPeriodicNorthSouth():
             if self.grid.north is not None:
                 boundary_conditions_args['north'] = BoundaryType.DIRICHLET
             if self.grid.south is not None:
                 boundary_conditions_args['south'] = BoundaryType.DIRICHLET
-        if not boundary_conditions.isPeriodicEastWest():
+        if boundary_conditions.isPeriodicEastWest() and self.grid.nodes_x > 1:
+            boundary_conditions_args['east'] = BoundaryType.DIRICHLET
+            boundary_conditions_args['west'] = BoundaryType.DIRICHLET
+        elif not boundary_conditions.isPeriodicEastWest():
             if self.grid.east is not None:
                 boundary_conditions_args['east'] = BoundaryType.DIRICHLET
             if self.grid.west is not None:
@@ -137,9 +150,9 @@ class MPIWrapper:
         # self.dt_stream = GPUStream(default_stream=False)
         # with self.dt_stream._cupy_stream:
         self.global_dt = cp.empty_like(self.sim.max_dt_buffer.data, shape=1)
+        self.mpi_dt = None
 
         if self.total_nodes > 1:
-            self.mpi_dt = None
             # Only use NCCL when each MPI rank has its own GPU device;
             # NCCL does not support multiple ranks sharing the same device.
             from gpuocean.utils.gpu import gpu_device
@@ -177,6 +190,14 @@ class MPIWrapper:
         """
         Decomposes an array, also checks if the array is valid.
         """
+        spatial_shape = array.shape in (self._original_shape,
+                                         (self._original_shape[0] + 1, self._original_shape[1] + 1))
+        if spatial_shape and self.periodic_x and self.grid.nodes_x > 1:
+            indices = (np.arange(array.shape[1]) - self.ghost_cells.west) % self.global_nx + self.ghost_cells.west
+            array = np.take(array, indices, axis=1)
+        if spatial_shape and self.periodic_y and self.grid.nodes_y > 1:
+            indices = (np.arange(array.shape[0]) - self.ghost_cells.south) % self.global_ny + self.ghost_cells.south
+            array = np.take(array, indices, axis=0)
         if array.shape == self._original_shape:
             return array[self._splice_y0:self._splice_y1, self._splice_x0:self._splice_x1]
         elif array.shape == (self._original_shape[0] + 1, self._original_shape[1] + 1):
@@ -332,20 +353,16 @@ class MPIWrapper:
 
         eta_local, hu_local, hv_local = self.sim.download(interior_domain_only)
 
-        eta_arrays = self.comm.gather(eta_local, root=root)
-        hu_arrays = self.comm.gather(hu_local, root=root)
-        hv_arrays = self.comm.gather(hv_local, root=root)
+        pieces = self.comm.gather((self.grid.x0, self.grid.x1, self.grid.y0, self.grid.y1,
+                                   eta_local, hu_local, hv_local), root=root)
 
         if self.comm.rank == root:
-            eta = np.block(
-                [[eta_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
-            hu = np.block(
-                [[hu_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
-            hv = np.block(
-                [[hv_arrays[x + (x * y)] for x in range(self.grid.nodes_x)] for y in range(self.grid.nodes_y)])
-
-            return eta, hu, hv
-        else:
-            return None
+            fields = [np.empty((self.grid.global_ny, self.grid.global_nx), dtype=eta_local.dtype)
+                      for _ in range(3)]
+            for x0, x1, y0, y1, *arrays in pieces:
+                for field, array in zip(fields, arrays):
+                    field[y0:y1, x0:x1] = array
+            return tuple(fields)
+        return None
 
 

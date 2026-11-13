@@ -43,14 +43,15 @@ class Grid:
     y0: int
     y1: int
 
-    def __init__(self, nx: int, ny: int, comm: MPI.Intracomm, strong_scale=True, periodic=False):
+    def __init__(self, nx: int, ny: int, comm: MPI.Intracomm, strong_scale=True,
+                 periodic: bool | tuple[bool, bool] = False):
         """
         Creates a grid for the given domain.
         :param nx: Size of the domain in the x-axis.
         :param ny: Size of the domain in the y-axis.
         :param comm: MPI Communication context.
         :param strong_scale: Decompose the domain in regard to strong scaling.
-        :param periodic: Allowing exchanges to be periodic around the global borders.
+        :param periodic: Periodicity in (x, y), or a boolean for both axes.
         """
 
         Grid.global_nx = nx
@@ -74,14 +75,16 @@ class Grid:
         Coordinate.nodes_x = self.nodes_x
         Coordinate.nodes_y = self.nodes_y
 
+        if isinstance(periodic, bool):
+            periodic = (periodic, periodic)
         self.cart_comm = comm.Create_cart(
-            dims=[self.nodes_x, self.nodes_y],
-            periods=[periodic, periodic],
+            dims=[self.nodes_y, self.nodes_x],
+            periods=[periodic[1] and self.nodes_y > 1, periodic[0] and self.nodes_x > 1],
             reorder=True
         )
 
         self.rank = self.cart_comm.Get_rank()
-        Grid.x_pos, Grid.y_pos = self.cart_comm.Get_coords(self.rank)
+        Grid.y_pos, Grid.x_pos = self.cart_comm.Get_coords(self.rank)
 
         # Current coordinates of this grid.
         self.location = self._calculate_coordinate()
@@ -99,10 +102,10 @@ class Grid:
         Grid.y0, Grid.y1 = global_coordinates[1]
 
         # Get the coordinates of all the neighbors
-        _, cart_east = self.cart_comm.Shift(0, 1)
-        _, cart_west = self.cart_comm.Shift(0, -1)
-        _, cart_north = self.cart_comm.Shift(1, 1)
-        _, cart_south = self.cart_comm.Shift(1, -1)
+        _, cart_east = self.cart_comm.Shift(1, 1)
+        _, cart_west = self.cart_comm.Shift(1, -1)
+        _, cart_north = self.cart_comm.Shift(0, 1)
+        _, cart_south = self.cart_comm.Shift(0, -1)
 
         cart_group = self.cart_comm.Get_group()
         world_group = comm.Get_group()
@@ -201,8 +204,7 @@ class Grid:
         Calculate the coordinate for the rank of this process.
         :returns: This rank's coordinates, with indexing starting at 0.
         """
-        y = self.rank // self.nodes_x
-        x = self.rank % self.nodes_x
+        x, y = self.x_pos, self.y_pos
 
         # Checks that the coordinates are sane.
         if y > self.nodes_y - 1:
