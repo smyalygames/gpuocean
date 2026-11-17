@@ -71,6 +71,13 @@ class AtmosphericPressure():
             assert(self.P[i].dtype == "float32"), "Failed to make atmospheric pressure to type np.float32"
 
 
+    def subdomain(self, x0, x1, y0, y1, global_shape):
+        from gpuocean.utils.Common import slice_spatial_field
+        fields = [slice_spatial_field(a, x0, x1, y0, y1, global_shape) for a in self.P]
+        result = AtmosphericPressure(t=list(self.t), P=fields, shiftValue=0)
+        result.shiftValue = self.shiftValue
+        return result
+
     def getOriginalP(self):
 
         orig_P = [None]*len(self.P)

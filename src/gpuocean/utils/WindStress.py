@@ -29,7 +29,7 @@ import numpy as np
 import numpy.typing as npt
 
 from abc import ABCMeta, abstractmethod
-from gpuocean.utils.Common import deprecated
+from gpuocean.utils.Common import deprecated, slice_spatial_field
 
 
 class WindStress:
@@ -81,6 +81,14 @@ class WindStress:
 
             self.stress_u = stress_u
             self.stress_v = stress_v
+
+    def subdomain(self, x0, x1, y0, y1, global_shape):
+        fields = {}
+        for name in ("wind_u", "wind_v", "stress_u", "stress_v"):
+            values = getattr(self, name)
+            fields[name] = (None if values is None else [
+                slice_spatial_field(a, x0, x1, y0, y1, global_shape) for a in values])
+        return WindStress(source_filename=self.source_filename, t=list(self.t), **fields)
 
     def compute_wind_stress_from_wind(self, wind_u=None, wind_v=None):
 

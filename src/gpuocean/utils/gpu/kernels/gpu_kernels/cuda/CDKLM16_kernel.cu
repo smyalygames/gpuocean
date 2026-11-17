@@ -512,7 +512,11 @@ __global__ void cdklm_swe_2D(
 
         // Boundary conditions (1: wall, 2: periodic, 3: open boundary (flow relaxation scheme))
         // Note: these are packed north, east, south, west boolean bits into an int
-        const int boundary_conditions_) {
+        const int boundary_conditions_
+#if BUDGET_DIAGNOSTICS
+        , double* budget_
+#endif
+        ) {
             
     //const float land_value_ = 1.0e20;
 
@@ -963,6 +967,9 @@ float2 atm_p_central_diff;
         float updated_eta;
         float updated_hu;
         float updated_hv;
+#if BUDGET_DIAGNOSTICS
+        double friction_u = 0.0, friction_v = 0.0;
+#endif
         
         if (RK_ORDER < 3) {
 
@@ -1013,6 +1020,11 @@ float C;
                 updated_hv  =  hv_b / (1.0f + 0.5f*C);
 
             }
+#if BUDGET_DIAGNOSTICS
+            // RK2 weights the first-stage friction by 1/2; the final denominator uses C/2.
+            friction_u = -0.5 * double(C) * double(updated_hu);
+            friction_v = -0.5 * double(C) * double(updated_hv);
+#endif
         }
 
 
@@ -1069,12 +1081,32 @@ float C;
         }
     
 
+#if BUDGET_DIAGNOSTICS
+        const float3 before_clipping = make_float3(updated_eta, updated_hu, updated_hv);
+#endif
         const float updated_h = updated_eta + Hm;
         if ((updated_h <= KPSIMULATOR_DEPTH_CUTOFF) ) { 
             updated_eta = -Hm + KPSIMULATOR_DEPTH_CUTOFF;
             updated_hu  = 0.0f;
             updated_hv  = 0.0f;
         }
+#if BUDGET_DIAGNOSTICS
+        const int cell = (tj - 2) * NX + ti - 2;
+        const int cells = NX * NY;
+        const double half_dt = 0.5 * double(dt_);
+        const double clip_weight = step_ == 0 ? 0.5 : 1.0;
+        budget_[cell] -= half_dt * double(flux_diff.x);
+        budget_[cells + cell] -= half_dt * double(flux_diff.y);
+        budget_[2*cells + cell] -= half_dt * double(flux_diff.z);
+        budget_[4*cells + cell] += half_dt * double(st1);
+        budget_[5*cells + cell] += half_dt * double(st2);
+        budget_[7*cells + cell] += friction_u;
+        budget_[8*cells + cell] += friction_v;
+        budget_[9*cells + cell] += clip_weight *
+            (double(fmaxf(-Hm + KPSIMULATOR_DEPTH_CUTOFF, updated_eta)) - double(before_clipping.x));
+        budget_[10*cells + cell] += clip_weight * (double(updated_hu) - double(before_clipping.y));
+        budget_[11*cells + cell] += clip_weight * (double(updated_hv) - double(before_clipping.z));
+#endif
 
         if ( (RK_ORDER == 3) && (step_ == 1) ) {
             float* const eta_out_row = (float*) ((char*) eta0_ptr_ + eta0_pitch_*tj);

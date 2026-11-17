@@ -464,6 +464,18 @@ class SingleBoundaryConditionData:
         return str(self.numSteps) + " steps, each " + str(self.shape)
 
 
+def slice_spatial_field(field, x0, x1, y0, y1, global_shape):
+    """Localize a full-grid or spatially constant forcing field, including halos."""
+    ny, nx = global_shape
+    if not (0 <= x0 < x1 <= nx and 0 <= y0 < y1 <= ny):
+        raise ValueError("Forcing subdomain indices must lie within the global grid")
+    if field.shape == (1, 1):
+        return field.copy()
+    if field.shape != global_shape:
+        raise ValueError(f"MPI forcing must be constant or on the global grid: {field.shape} vs {global_shape}")
+    return field[y0:y1, x0:x1].copy()
+
+
 class BoundaryConditionsData:
     """
     This class holds external solution for all boundaries over time.
@@ -495,6 +507,28 @@ class BoundaryConditionsData:
             north.h[0].shape) + " vs " + str(south.h[0].shape)
         assert (east.h[0].shape == west.h[0].shape), "Wrong shape of east vs west " + str(
             east.h[0].shape) + " vs " + str(west.h[0].shape)
+
+    def subdomain(self, x0, x1, y0, y1, global_shape):
+        """Slice spatial boundary series, retaining uniform two-point boundary data."""
+        def part(data, start, stop, expected):
+            if data.h[0].shape[0] == 2:
+                if any(not np.all(np.asarray(values)[:, 0] == np.asarray(values)[:, 1])
+                       for values in (data.h, data.hu, data.hv)):
+                    raise ValueError("Spatially varying MPI boundary data must be sampled on the global grid")
+                return data
+            if data.h[0].shape[0] != expected:
+                raise ValueError(f"Boundary length {data.h[0].shape[0]} does not match global length {expected}")
+            return SingleBoundaryConditionData(
+                *[np.asarray(values, dtype=np.float32)[:, start:stop].copy()
+                  for values in (data.h, data.hu, data.hv)])
+
+        ny, nx = global_shape
+        if not (0 <= x0 < x1 <= nx and 0 <= y0 < y1 <= ny):
+            raise ValueError("Boundary subdomain indices must lie within the global grid, including halos")
+        return BoundaryConditionsData(
+            list(self.t),
+            north=part(self.north, x0, x1, nx), south=part(self.south, x0, x1, nx),
+            east=part(self.east, y0, y1, ny), west=part(self.west, y0, y1, ny))
 
     def __str__(self):
         return "Steps=" + str(self.numSteps) \

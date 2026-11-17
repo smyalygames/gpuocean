@@ -113,6 +113,16 @@ class MPIWrapper:
             self._splice_x1 = self.grid.x1 + self.ghost_cells.total_x
             self._splice_y0 = self.grid.y0
             self._splice_y1 = self.grid.y1 + self.ghost_cells.total_y
+            if self.total_nodes > 1 and "boundary_conditions_data" in kwargs:
+                kwargs["boundary_conditions_data"] = kwargs["boundary_conditions_data"].subdomain(
+                    self._splice_x0, self._splice_x1, self._splice_y0, self._splice_y1,
+                    self._original_shape)
+            if self.total_nodes > 1:
+                for name in ("wind", "atmospheric_pressure"):
+                    if name in kwargs:
+                        kwargs[name] = kwargs[name].subdomain(
+                            self._splice_x0, self._splice_x1, self._splice_y0, self._splice_y1,
+                            self._original_shape)
 
             self.logger.debug(
                 f"Splicing arrays with [{self._splice_y0}:{self._splice_y1}, {self._splice_x0}:{self._splice_x1}] Original sape: {self._original_shape}.")
@@ -231,6 +241,8 @@ class MPIWrapper:
         self.sim.wind_stress_timestamps = {}
         self.sim.atmospheric_pressure_timestamps = {}
         self.sim.init_count += 1
+        if getattr(self.sim, "budget", None) is not None:
+            self.sim.budget.reset()
 
         if self.sim.write_netcdf:
             self.sim.sim_writer.sim_reinit(self.sim)

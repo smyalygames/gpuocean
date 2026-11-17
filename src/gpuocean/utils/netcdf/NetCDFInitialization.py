@@ -88,7 +88,9 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
                          sponge_cells=SpongeCells(north=20, south=20, east=20, west=20),
                          erode_land=0,
                          download_data=False,
-                         cache_dir: str | None = None
+                         cache_dir: str | None = None,
+                         wind_forcing=True,
+                         time_values=None
                          ):
     """
     Constructing input arguments for CDKLM16 instances
@@ -96,6 +98,9 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
     timestep_indices   - list with timestep_indices per file (for a single file, e.g., "[[12,13,14,15,16]]") 
     norkyst_data       - boolean whether source_url corresponds to a *Z-level* file from NorKyst800 model outputs
     download_data      - downloading the source file for faster initialization next time - warning: downloaded files might be large
+    wind_forcing       - read source winds; False explicitly disables wind forcing
+    time_values        - optional absolute seconds per selected record/file, already
+                         decoded to a common epoch (for differing CF time units/origins)
     """
 
     ic = {}
@@ -148,6 +153,14 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
             raise e
         finally:
             ncfile.close()
+
+    if time_values is not None:
+        if len(time_values) != num_files or any(len(values) != len(indices)
+                                               for values, indices in zip(time_values, timestep_indices)):
+            raise ValueError("time_values must match the selected records in every source file")
+        timesteps = [np.asarray(values, dtype=np.float64) for values in time_values]
+        if any(not np.all(np.isfinite(values)) for values in timesteps):
+            raise ValueError("time_values must be finite absolute seconds")
 
     # Generate timesteps in reference to t0
     t0 = timesteps[0][0]
@@ -319,7 +332,8 @@ def getInitialConditions(source_url_list, x0, x1, y0, y1,
                                                    west=BoundaryType.FLOW_RELAXATION_SCHEME, sponge_cells=sponge_cells)
 
     # wind (wind speed in m/s used for forcing on drifter)
-    ic['wind'] = getWind(source_url_list, timestep_indices, timesteps, x0, x1, y0, y1)
+    ic['wind'] = (getWind(source_url_list, timestep_indices, timesteps, x0, x1, y0, y1)
+                  if wind_forcing else WindStress.WindStress())
 
     # Note
     ic['note'] = datetime.datetime.now().isoformat() + ": Generated from " + str(source_url_list)
