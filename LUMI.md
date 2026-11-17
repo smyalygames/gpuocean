@@ -1,4 +1,4 @@
-# Convert Docker image to Singularity:
+# Convert Docker image to Singularity
 
 There is a pre-built Docker image for LUMI, however, as LUMI does not support Docker containers, it needs to be
 converted to a Singularity/Apptainer container.
